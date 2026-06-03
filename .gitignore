@@ -1,0 +1,15 @@
+# Секреты — НИКОГДА не коммитим (.env.example остаётся, это шаблон без ключа)
+.env
+*.key
+credentials*
+
+# Виртуальные окружения и кэш Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# macOS / IDE мусор
+.DS_Store
+.idea/
+.vscode/
