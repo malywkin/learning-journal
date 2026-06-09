@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Стеклянный агент · День 6</title>
+<!-- Серифный шрифт для текста (в духе Butterick: Source Serif / Charter / Georgia) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1d1d1f; --muted:#86868b; --line:#e7e7e4; --bg:#ffffff;
+    --panel:#fbfbf9; --accent:#0071e3; --user:#f3f5f7; --green:#34c759;
+    --serif:"Source Serif 4", Charter, Georgia, "Times New Roman", serif;
+    --sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, sans-serif;
+    --mono:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--serif);
+    font-size:19px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  /* ── шапка ─────────────────────────────────────────────────────────── */
+  header{
+    display:flex; align-items:baseline; gap:16px;
+    padding:26px 44px 18px; border-bottom:1px solid var(--line);
+  }
+  header h1{ margin:0; font-weight:600; font-size:27px; letter-spacing:-0.015em; }
+  header .sub{ font-family:var(--sans); color:var(--muted); font-size:13.5px; }
+  header .spacer{ flex:1 }
+  .btn{
+    font-family:var(--sans); font-size:14px; line-height:1; cursor:pointer;
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:9px 16px; border-radius:980px; transition:.15s;
+  }
+  .btn:hover{ border-color:#c7c7cc; background:#fafafa }
+  .btn-primary{ background:var(--accent); color:#fff; border-color:var(--accent) }
+  .btn-primary:hover{ background:#0063c8 }
+  /* ── раскладка ─────────────────────────────────────────────────────── */
+  .wrap{ display:flex; height:calc(100vh - 79px) }
+  .col-chat{ flex:1; display:flex; flex-direction:column; min-width:0 }
+  .transcript{ flex:1; overflow:auto; padding:30px 44px }
+  .msg{ margin:0 auto 24px; max-width:720px }
+  .msg .who{
+    font-family:var(--sans); font-size:11px; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:5px;
+  }
+  .msg.user .bubble{ background:var(--user); border-radius:16px; padding:13px 17px; display:inline-block }
+  .msg.bot .bubble{ padding:0 }
+  .bubble{ white-space:pre-wrap; word-wrap:break-word }
+  /* ── нижние контролы ───────────────────────────────────────────────── */
+  .controls{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:11px 44px; border-top:1px solid var(--line);
+    font-family:var(--sans); font-size:13px; color:var(--muted);
+  }
+  .composer{ display:flex; gap:12px; align-items:flex-end; padding:16px 44px; border-top:1px solid var(--line) }
+  textarea#input{
+    flex:1; font-family:var(--serif); font-size:18px; line-height:1.4;
+    border:1px solid var(--line); border-radius:16px; padding:13px 16px;
+    resize:none; max-height:170px; outline:none; color:var(--ink);
+  }
+  textarea#input:focus{ border-color:var(--accent) }
+  /* iOS-переключатель */
+  .switch{ position:relative; display:inline-block; width:44px; height:26px; flex:none }
+  .switch input{ display:none }
+  .slider{ position:absolute; inset:0; background:#d2d2d7; border-radius:980px; transition:.2s }
+  .slider:before{
+    content:""; position:absolute; width:22px; height:22px; left:2px; top:2px;
+    background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .slider{ background:var(--green) }
+  .switch input:checked + .slider:before{ transform:translateX(18px) }
+  .spacer-f{ flex:1 }
+  /* ── панель «под капотом» ──────────────────────────────────────────── */
+  .col-hood{
+    width:42%; max-width:580px; border-left:1px solid var(--line);
+    background:var(--panel); overflow:auto; padding:26px 30px; font-family:var(--sans);
+  }
+  .col-hood.hidden{ display:none }
+  .col-hood h2{
+    font-family:var(--sans); font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px;
+  }
+  #hoodState{ font-size:15px; line-height:1.45; margin-bottom:8px; color:var(--ink) }
+  #hoodMeta{ font-size:13px; color:var(--muted); margin-bottom:16px }
+  pre.json{
+    font-family:var(--mono); font-size:12.5px; line-height:1.55; color:#1d1d1f;
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:15px;
+    white-space:pre-wrap; word-break:break-word; margin:0;
+  }
+  .role-edit{ margin-top:26px }
+  .role-edit textarea{
+    width:100%; font-family:var(--serif); font-size:15px; line-height:1.4;
+    border:1px solid var(--line); border-radius:12px; padding:11px 13px; resize:vertical;
+    min-height:74px; outline:none; color:var(--ink);
+  }
+  .role-edit textarea:focus{ border-color:var(--accent) }
+  .hint{ font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:6px }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Стеклянный агент</h1>
+    <span class="sub">День 6 · видно, что на самом деле уходит в модель</span>
+    <span class="spacer"></span>
+    <button class="btn" id="toggleHood">Капот</button>
+  </header>
+
+  <div class="wrap">
+    <div class="col-chat">
+      <div class="transcript" id="transcript"></div>
+
+      <div class="controls">
+        <label class="switch"><input type="checkbox" id="memory" checked><span class="slider"></span></label>
+        <span id="memlabel">Память: ВКЛ — это <b>агент</b></span>
+        <span class="spacer-f"></span>
+        <button class="btn" id="reset">Сбросить память</button>
+      </div>
+
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Напишите сообщение…  (Enter — отправить, Shift+Enter — перенос)"></textarea>
+        <button class="btn btn-primary" id="send">Отправить</button>
+      </div>
+    </div>
+
+    <aside class="col-hood" id="hood">
+      <h2>🔧 Под капотом — что уходит в модель</h2>
+      <div id="hoodState">Напишите первое сообщение — и здесь появится то, что уходит в модель.</div>
+      <div id="hoodMeta"></div>
+      <pre class="json" id="hoodJson"></pre>
+
+      <div class="role-edit">
+        <h2>Роль агента (system)</h2>
+        <textarea id="role"></textarea>
+        <div class="hint">Поменяйте текст — поменяется поведение. Код трогать не нужно.</div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const transcript = $("#transcript");
+
+  // Подтянуть роль по умолчанию с сервера (единый источник правды).
+  fetch("/api/default_role").then(r=>r.json()).then(d=>{ $("#role").value = d.role; });
+
+  function addMsg(who, text){
+    const m = document.createElement("div");
+    m.className = "msg " + (who === "user" ? "user" : "bot");
+    const w = document.createElement("div"); w.className = "who";
+    w.textContent = who === "user" ? "Вы" : "Ассистент";
+    const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+    m.appendChild(w); m.appendChild(b);
+    transcript.appendChild(m);
+    transcript.scrollTop = transcript.scrollHeight;
+    return b;            // вернём «пузырь», чтобы потом заменить «…» на ответ
+  }
+
+  function renderHood(sent, memory){
+    $("#hoodState").innerHTML = memory
+      ? "<b>Память: ВКЛ</b> — это <b>агент</b>: шлём всю историю заново."
+      : "<b>Память: ВЫКЛ</b> — это <b>один вызов</b>: шлём только последнюю реплику.";
+    const chars = sent.reduce((a,m)=>a + m.content.length, 0);
+    $("#hoodMeta").textContent =
+      `Ушло в модель: ${sent.length} сообщ. · ~${chars} симв. (≈${Math.round(chars/4)} токенов)`;
+    $("#hoodJson").textContent = JSON.stringify(sent, null, 2);
+  }
+
+  async function send(){
+    const input = $("#input");
+    const text = input.value.trim();
+    if(!text) return;
+    const memory = $("#memory").checked;
+    const role = $("#role").value;
+
+    addMsg("user", text);
+    input.value = ""; autoGrow(input);
+    const bubble = addMsg("bot", "…");          // плейсхолдер «думает»
+
+    try{
+      const r = await fetch("/api/chat", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ message:text, memory, role })
+      });
+      const data = await r.json();
+      bubble.textContent = data.reply;
+      renderHood(data.sent, memory);
+    }catch(e){
+      bubble.textContent = "[ошибка сети: " + e + "]";
+    }
+  }
+
+  function autoGrow(t){ t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 170) + "px"; }
+
+  $("#send").onclick = send;
+  $("#input").addEventListener("input", e => autoGrow(e.target));
+  $("#input").addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); }
+  });
+  $("#memory").onchange = e => {
+    $("#memlabel").innerHTML = e.target.checked
+      ? "Память: ВКЛ — это <b>агент</b>"
+      : "Память: ВЫКЛ — это <b>один вызов</b>";
+  };
+  $("#reset").onclick = async () => {
+    await fetch("/api/reset", { method:"POST" });
+    transcript.innerHTML = "";
+    $("#hoodState").textContent = "Память очищена — агент начинает с чистого листа.";
+    $("#hoodMeta").textContent = ""; $("#hoodJson").textContent = "";
+  };
+  $("#toggleHood").onclick = () => $("#hood").classList.toggle("hidden");
+</script>
+</body>
+</html>
