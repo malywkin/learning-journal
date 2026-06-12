@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>День 7 — Как агент помнит между запусками</title>
+<style>
+  /* ── Палитра и типографика (Apple-чисто + Butterick «Typography for Lawyers») ── */
+  :root{
+    --bg:#fbfaf7; --ink:#1d1d1f; --muted:#73706a; --line:#e6e2d8;
+    --prog:#2563eb;        /* программа — синий  */
+    --prog-bg:#eaf1ff;
+    --model:#c2683f;       /* модель — терракот  */
+    --model-bg:#fbeee7;
+    --disk:#1f9d6b;        /* диск — зелёный     */
+    --disk-bg:#e8f6ef;
+    --user:#2563eb; --asst:#8a8a8f;
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Georgia,'Iowan Old Style','Times New Roman',serif;
+    -webkit-font-smoothing:antialiased}
+  .ui{font-family:-apple-system,system-ui,'Segoe UI',sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:28px 20px 60px}
+
+  header h1{font-size:26px;margin:0 0 4px;letter-spacing:-.2px}
+  header p.sub{margin:0;color:var(--muted);font-size:16px}
+  .progress{height:4px;background:var(--line);border-radius:4px;margin:18px 0 6px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:var(--ink);width:0;
+    transition:width .4s cubic-bezier(.4,0,.2,1)}
+
+  /* ── Сцена ── */
+  .stage{position:relative;display:grid;grid-template-columns:1fr 130px 1fr;
+    gap:0;align-items:stretch;margin:14px 0 8px;min-height:300px}
+  .zone{border:1.5px solid var(--line);border-radius:16px;background:#fff;
+    padding:14px 14px 16px;box-shadow:var(--shadow);transition:opacity .35s,filter .35s,border-color .35s}
+  .zone h3{margin:0 0 10px;font-size:13px;letter-spacing:.3px;text-transform:uppercase;
+    font-family:-apple-system,system-ui,sans-serif;color:var(--muted);font-weight:700}
+  .zone .who{font-size:12px;color:var(--muted);font-style:italic;margin:-6px 0 10px}
+
+  .prog{border-color:#cfe0ff}
+  .model{border-color:#f0d3c5}
+  .dimmed{opacity:.32;filter:saturate(.4)}
+  .active{border-width:2px}
+  .prog.active{border-color:var(--prog);box-shadow:0 0 0 4px var(--prog-bg),var(--shadow)}
+  .model.active{border-color:var(--model);box-shadow:0 0 0 4px var(--model-bg),var(--shadow)}
+  .disk.active{border-color:var(--disk);box-shadow:0 0 0 4px var(--disk-bg),var(--shadow)}
+
+  /* средний коридор со стрелками */
+  .gap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;position:relative}
+  .arrow{font-size:12px;color:var(--muted);text-align:center;font-family:-apple-system,system-ui,sans-serif;
+    line-height:1.3;opacity:.5;transition:opacity .3s}
+  .arrow b{display:block;font-size:22px;color:var(--ink)}
+  .arrow.lit{opacity:1}
+  .arrow.lit b{color:var(--prog)}
+  .arrow.back.lit b{color:var(--model)}
+
+  /* стол истории = чипы сообщений */
+  .label{font-size:11px;color:var(--muted);font-family:-apple-system,system-ui,sans-serif;
+    text-transform:uppercase;letter-spacing:.4px;margin:6px 0 4px;font-weight:700}
+  .desk{min-height:64px;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;
+    padding:8px;border:1px dashed var(--line);border-radius:10px;background:#fcfcfa;position:relative}
+  .chip{font-family:-apple-system,system-ui,sans-serif;font-size:11.5px;line-height:1.25;
+    padding:5px 8px;border-radius:8px;max-width:100%;color:#fff;
+    transform:scale(.6);opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s}
+  .chip.show{transform:scale(1);opacity:1}
+  .chip.u{background:var(--user)} .chip.a{background:var(--asst)}
+  .chip small{display:block;font-size:9px;opacity:.8;text-transform:uppercase;letter-spacing:.3px}
+
+  /* рамка «окна» вокруг последних N чипов */
+  .windowband{margin-top:10px;border:2px solid transparent;border-radius:10px;padding:6px;
+    transition:border-color .3s,background .3s}
+  .windowband.lit{border-color:var(--prog);background:var(--prog-bg)}
+  .windowband .wlabel{font-size:10px;color:var(--prog);font-family:-apple-system,system-ui,sans-serif;
+    font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;opacity:0;transition:opacity .3s}
+  .windowband.lit .wlabel{opacity:1}
+
+  /* память модели */
+  .brain{min-height:64px;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;
+    padding:8px;border:1px dashed #f0d3c5;border-radius:10px;background:#fffaf7}
+  .amnesia{color:var(--model);font-family:-apple-system,system-ui,sans-serif;font-size:13px;
+    font-style:italic;display:flex;align-items:center;gap:6px}
+
+  /* диск */
+  .disk{grid-column:1 / -1;margin-top:4px;border:1.5px solid #bfe6d3;border-radius:16px;
+    background:#fff;padding:14px;box-shadow:var(--shadow);transition:opacity .35s,filter .35s,border-color .35s}
+  .disk h3{color:var(--disk)}
+  .diskrow{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .store{flex:1;min-width:240px}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    font-family:-apple-system,system-ui,sans-serif;font-size:13px;margin-bottom:8px}
+  .toggle button{border:0;background:#fff;padding:7px 14px;cursor:pointer;color:var(--muted);font-weight:600}
+  .toggle button.on{background:var(--disk);color:#fff}
+
+  /* JSON-лист */
+  .sheet{border:1px solid var(--line);border-radius:10px;background:#fcfcfa;padding:10px;
+    font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:#333;white-space:pre;
+    overflow:auto;max-height:150px;transition:box-shadow .2s}
+  .sheet.rewrite{animation:flash .7s}
+  @keyframes flash{0%{box-shadow:0 0 0 0 var(--disk)}30%{box-shadow:0 0 0 3px var(--disk-bg);background:#f0fbf6}100%{box-shadow:0 0 0 0 transparent}}
+
+  /* SQLite-журнал */
+  .ledger{border:1px solid var(--line);border-radius:10px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif;font-size:12px}
+  .ledger .lrow{display:grid;grid-template-columns:34px 70px 1fr;border-top:1px solid var(--line)}
+  .ledger .lrow:first-child{border-top:0;background:#f4f2ec;font-weight:700;color:var(--muted);font-size:11px}
+  .ledger .lrow > span{padding:6px 8px;border-left:1px solid var(--line)}
+  .ledger .lrow > span:first-child{border-left:0}
+  .ledger .lrow.new{animation:slidein .5s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes slidein{from{transform:translateY(-8px);opacity:0;background:#e8f6ef}to{transform:none;opacity:1}}
+
+  /* летящий «пакет/папка» */
+  .packet{position:absolute;z-index:30;pointer-events:none;background:#fff;border:1.5px solid var(--prog);
+    color:var(--prog);font-family:-apple-system,system-ui,sans-serif;font-size:11px;font-weight:700;
+    padding:6px 10px;border-radius:10px;box-shadow:var(--shadow);opacity:0;
+    transition:transform .9s cubic-bezier(.45,.05,.3,1),opacity .25s;left:0;top:0}
+  .packet.back{border-color:var(--model);color:var(--model)}
+  .packet .pmsg{display:block;font-weight:400;color:var(--ink);max-width:160px;white-space:normal;margin-top:3px}
+
+  /* ── Подпись шага + предсказание ── */
+  .caption{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;
+    box-shadow:var(--shadow);margin-top:12px;font-size:17px;line-height:1.5}
+  .caption .stepttl{font-family:-apple-system,system-ui,sans-serif;font-size:13px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:6px}
+  .caption b{color:var(--ink)}
+  .hl-prog{color:var(--prog);font-weight:700}
+  .hl-model{color:var(--model);font-weight:700}
+  .hl-disk{color:var(--disk);font-weight:700}
+
+  .predict{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .predict .q{font-family:-apple-system,system-ui,sans-serif;font-size:15px;font-weight:600;margin-bottom:10px}
+  .predict .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .predict .opts button{font-family:-apple-system,system-ui,sans-serif;font-size:14px;cursor:pointer;
+    background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:9px 14px;transition:all .15s}
+  .predict .opts button:hover{border-color:var(--ink)}
+  .predict .opts button.right{background:var(--disk-bg);border-color:var(--disk);color:#0f6b48}
+  .predict .opts button.wrong{background:#fdecea;border-color:#d9534f;color:#b23b36}
+  .predict .opts button:disabled{cursor:default;opacity:.85}
+  .predict .reveal{margin-top:10px;font-size:15px;line-height:1.5;display:none}
+  .predict .reveal.show{display:block;animation:fade .4s}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ── Песочница (последний шаг) ── */
+  .sandbox{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-family:-apple-system,system-ui,sans-serif;display:none}
+  .sandbox.show{display:block}
+  .sandbox .row{display:flex;align-items:center;gap:12px;font-size:14px;margin-bottom:8px}
+  .sandbox input[type=range]{flex:1;accent-color:var(--prog)}
+  .sandbox .stat{font-size:14px}
+  .sandbox .stat b{font-size:16px}
+
+  /* ── Навигация ── */
+  .nav{display:flex;align-items:center;justify-content:space-between;margin-top:16px;
+    font-family:-apple-system,system-ui,sans-serif}
+  .nav button{font-size:15px;font-weight:600;padding:11px 20px;border-radius:12px;border:1.5px solid var(--ink);
+    background:var(--ink);color:#fff;cursor:pointer;transition:opacity .15s}
+  .nav button.ghost{background:#fff;color:var(--ink)}
+  .nav button:disabled{opacity:.3;cursor:default}
+  .nav .count{color:var(--muted);font-size:14px}
+  .hidden{visibility:hidden}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Как агент помнит между запусками</h1>
+    <p class="sub ui">День 7 · нажимай «Дальше» — и смотри, что куда течёт. Где спросят «как думаешь?» — сначала угадай.</p>
+    <div class="progress"><i id="bar"></i></div>
+  </header>
+
+  <!-- СЦЕНА -->
+  <div class="stage" id="stage">
+    <!-- Программа -->
+    <div class="zone prog" id="zProg">
+      <h3>Наша программа</h3>
+      <div class="who">ассистент — ведёт всё хозяйство</div>
+      <div class="label">Стол · история разговора (в оперативной памяти)</div>
+      <div class="desk" id="desk"></div>
+      <div class="windowband" id="wband">
+        <div class="wlabel">📐 окно: что возьмём для модели</div>
+        <div class="label" style="margin:0">↑ последние ходы попадут в папку</div>
+      </div>
+    </div>
+
+    <!-- Коридор -->
+    <div class="gap">
+      <div class="arrow" id="arrFwd"><b>→</b>папка<br>(окно)</div>
+      <div class="arrow back" id="arrBack"><b>←</b>ответ</div>
+    </div>
+
+    <!-- Модель -->
+    <div class="zone model" id="zModel">
+      <h3>Модель (нейросеть)</h3>
+      <div class="who">консультант с амнезией</div>
+      <div class="label">Что помнит сама</div>
+      <div class="brain" id="brain"><span class="amnesia">помнит = ничего</span></div>
+      <div class="label" style="margin-top:10px">Видит сейчас (то, что в папке)</div>
+      <div class="brain" id="sees"></div>
+    </div>
+
+    <!-- Диск -->
+    <div class="disk" id="zDisk">
+      <h3>💾 Диск · архив (переживает выключение)</h3>
+      <div class="diskrow">
+        <div class="store">
+          <div class="toggle ui">
+            <button id="btnJson" class="on">JSON-лист</button>
+            <button id="btnSql">SQLite-журнал</button>
+          </div>
+          <div id="jsonView"><div class="sheet" id="sheet">[ пусто ]</div></div>
+          <div id="sqlView" style="display:none">
+            <div class="ledger" id="ledger">
+              <div class="lrow"><span>№</span><span>кто</span><span>что сказал</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- летящий пакет -->
+    <div class="packet" id="packet"></div>
+  </div>
+
+  <!-- ПОДПИСЬ ШАГА -->
+  <div class="caption">
+    <div class="stepttl ui" id="stepttl"></div>
+    <div id="captext"></div>
+
+    <!-- блок предсказания -->
+    <div class="predict" id="predict" style="display:none">
+      <div class="q ui" id="pq"></div>
+      <div class="opts ui" id="popts"></div>
+      <div class="reveal" id="preveal"></div>
+    </div>
+
+    <!-- песочница -->
+    <div class="sandbox" id="sandbox">
+      <div class="row">
+        <span>Размер окна: <b id="wval">2</b> ход(а)</span>
+        <input type="range" id="wslider" min="1" max="6" value="2">
+      </div>
+      <div class="stat">В <span class="hl-prog">модель</span> уйдёт: <b id="toModel">2</b> ход(а) из 6 &nbsp;·&nbsp;
+        На <span class="hl-disk">диске</span> останется: <b>все 6</b> — всегда.</div>
+    </div>
+  </div>
+
+  <!-- НАВИГАЦИЯ -->
+  <div class="nav">
+    <button class="ghost" id="prev">← Назад</button>
+    <span class="count ui" id="count"></span>
+    <button id="next">Дальше →</button>
+  </div>
+</div>
+
+<script>
+/* ====== Демо-разговор (юридический, под ученика) ====== */
+const TURN = {
+  u:{role:'u', who:'ты', text:'Я юрист. Запомни: клиент — ООО «Ромашка».'},
+  a:{role:'a', who:'модель', text:'Записал: клиент — ООО «Ромашка».'}
+};
+
+/* ====== Элементы ====== */
+const $=id=>document.getElementById(id);
+const desk=$('desk'), brain=$('brain'), sees=$('sees'), packet=$('packet'), stage=$('stage');
+const zProg=$('zProg'), zModel=$('zModel'), zDisk=$('zDisk');
+const arrFwd=$('arrFwd'), arrBack=$('arrBack'), wband=$('wband');
+
+let store='json';                 // выбранное хранилище
+let saved=[];                     // что «лежит на диске»
+
+/* ── вспомогательные рисовалки ── */
+function chip(container, m){
+  const c=document.createElement('div');
+  c.className='chip '+m.role;
+  c.innerHTML='<small>'+m.who+'</small>'+m.text;
+  container.appendChild(c);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>c.classList.add('show')));
+  return c;
+}
+function clearDesk(){desk.innerHTML='';}
+function setDimming(active){
+  [['prog',zProg],['model',zModel],['disk',zDisk]].forEach(([k,el])=>{
+    el.classList.toggle('dimmed', active.length>0 && !active.includes(k));
+    el.classList.toggle('active', active.includes(k));
+  });
+}
+/* пакет летит от одного блока к другому */
+function fly(fromEl,toEl,label,msg,back,cb){
+  const s=stage.getBoundingClientRect(), f=fromEl.getBoundingClientRect(), t=toEl.getBoundingClientRect();
+  packet.className='packet'+(back?' back':'');
+  packet.innerHTML=label+(msg?'<span class="pmsg">'+msg+'</span>':'');
+  packet.style.transition='none';
+  packet.style.transform='translate('+(f.left-s.left+f.width/2-40)+'px,'+(f.top-s.top+30)+'px)';
+  packet.style.opacity='0';
+  requestAnimationFrame(()=>{
+    packet.style.opacity='1';
+    requestAnimationFrame(()=>{
+      packet.style.transition='transform .9s cubic-bezier(.45,.05,.3,1),opacity .25s';
+      packet.style.transform='translate('+(t.left-s.left+t.width/2-40)+'px,'+(t.top-s.top+30)+'px)';
+    });
+  });
+  setTimeout(()=>{packet.style.opacity='0'; cb&&cb();}, 1050);
+}
+/* запись на диск */
+function diskWrite(){
+  if(store==='json'){
+    const sheet=$('sheet');
+    sheet.textContent='[\n'+saved.map(m=>'  { "'+(m.role==='u'?'ты':'модель')+'": "'+m.text+'" }').join(',\n')+'\n]';
+    sheet.classList.remove('rewrite'); void sheet.offsetWidth; sheet.classList.add('rewrite');
+  }else{
+    const led=$('ledger');
+    led.querySelectorAll('.lrow:not(:first-child)').forEach(r=>r.remove());
+    saved.forEach((m,i)=>{
+      const r=document.createElement('div'); r.className='lrow'+(i===saved.length-1?' new':'');
+      r.innerHTML='<span>'+(i+1)+'</span><span>'+(m.role==='u'?'ты':'модель')+'</span><span>'+m.text+'</span>';
+      led.appendChild(r);
+    });
+  }
+}
+function showStore(){
+  $('jsonView').style.display = store==='json'?'block':'none';
+  $('sqlView').style.display  = store==='sql' ?'block':'none';
+  $('btnJson').classList.toggle('on',store==='json');
+  $('btnSql').classList.toggle('on',store==='sql');
+  diskWrite();
+}
+$('btnJson').onclick=()=>{store='json';showStore();};
+$('btnSql').onclick =()=>{store='sql'; showStore();};
+
+/* ====== СЦЕНАРИЙ ШАГОВ ====== */
+const steps=[
+{ // 0
+  ttl:'Расстановка',
+  html:'Слева — <span class="hl-prog">наша программа</span> (ассистент: ведёт стол с историей и шкаф-диск). Справа — <span class="hl-model">модель</span>, нейросеть. Запомни главное: <b>модель не помнит ничего</b> — как консультант с амнезией. Между ними — коридор, по нему ходит <b>папка</b>.',
+  enter(){ setDimming([]); clearDesk(); brain.innerHTML='<span class="amnesia">помнит = ничего</span>'; sees.innerHTML=''; saved=[]; showStore(); wband.classList.remove('lit'); arrFwd.classList.remove('lit'); arrBack.classList.remove('lit'); }
+},
+{ // 1
+  ttl:'Шаг 1 · ты пишешь',
+  html:'Ты пишешь: <b>«'+TURN.u.text+'»</b>. Программа кладёт эту реплику на <span class="hl-prog">стол</span> — это список истории в оперативной памяти (быстрая, но гибнет при выключении).',
+  enter(){ setDimming(['prog']); clearDesk(); sees.innerHTML=''; brain.innerHTML='<span class="amnesia">помнит = ничего</span>'; chip(desk,TURN.u); }
+},
+{ // 2 — предсказание про stateless
+  ttl:'Шаг 2 · кто кого помнит',
+  html:'Теперь надо спросить модель. Но сначала — <b>важный вопрос про память</b>.',
+  predict:{
+    q:'Консультант (модель) помнит ваш прошлый разговор сам — или программа обязана каждый раз заново давать ему папку?',
+    opts:[
+      {t:'Помнит сам, он же умный', ok:false},
+      {t:'Надо каждый раз давать папку заново', ok:true}
+    ],
+    reveal:'<b>Каждый раз заново.</b> У модели нет памяти вообще. Поэтому ассистент перед <i>каждым</i> вопросом собирает папку и вкладывает туда историю. Не один раз в начале — а перед каждой репликой.'
+  },
+  enter(){ setDimming(['prog','model']); }
+},
+{ // 3 — окно + полёт папки
+  ttl:'Шаг 3 · собираем папку (окно) и несём модели',
+  html:'Ассистент берёт со стола <span class="hl-prog">последние ходы</span> — это «окно» — складывает в папку и несёт <span class="hl-model">модели</span>. <b>В модель уходит не весь архив, а только окно.</b>',
+  enter(){ setDimming(['prog','model']); wband.classList.add('lit'); arrFwd.classList.add('lit');
+    fly(zProg,zModel,'📁 папка',TURN.u.text,false,()=>{ sees.innerHTML=''; chip(sees,TURN.u); }); }
+},
+{ // 4 — модель отвечает и ЗАБЫВАЕТ
+  ttl:'Шаг 4 · ответ — и амнезия',
+  html:'Модель прочитала папку и ответила: <b>«'+TURN.a.text+'»</b>. Ответ летит назад. <b>А затем консультант всё забывает</b> — его память снова пуста. Помнит не он, а ассистент.',
+  enter(){ setDimming(['model','prog']); arrFwd.classList.remove('lit'); arrBack.classList.add('lit');
+    fly(zModel,zProg,'✉ ответ',TURN.a.text,true,()=>{
+      chip(desk,TURN.a);                 // ответ лёг на стол
+      sees.innerHTML='';                 // модель очистилась
+      brain.innerHTML='<span class="amnesia">помнит = ничего</span>';
+    }); }
+},
+{ // 5 — запись на диск + предсказание JSON vs SQLite
+  ttl:'Шаг 5 · подшиваем в архив на диск',
+  html:'Обе реплики ассистент <span class="hl-disk">подшивает в архив на диске</span> — чтобы пережить выключение. И вот тут — единственное место, где JSON и SQLite ведут себя <b>по-разному</b>.',
+  predict:{
+    q:'Добавили одну реплику. Что сделает каждое хранилище? (потом переключи тумблер и проверь)',
+    opts:[
+      {t:'JSON перепишет весь лист, SQLite допишет 1 строку', ok:true},
+      {t:'Оба допишут по одной строке', ok:false}
+    ],
+    reveal:'<b>JSON переписывает весь лист целиком</b> (формат — единый документ, иначе нельзя), <span class="hl-disk">SQLite дописывает одну строку</span> в конец. Переключи тумблер на диске и посмотри на разницу: лист мигает целиком — журнал добавляет строку.'
+  },
+  enter(){ setDimming(['prog','disk']); arrBack.classList.remove('lit');
+    saved=[TURN.u,TURN.a]; showStore(); }
+},
+{ // 6 — рестарт
+  ttl:'Шаг 6 · выключили и включили снова',
+  html:'Закрыли программу. <span class="hl-prog">Стол стёрся начисто</span> — оперативная память гибнет. <b>Но архив на диске цел.</b> При запуске ассистент достаёт архив с диска и <b>заново раскладывает его на стол</b>. Поэтому агент «помнит»: не реплика выжила — ассистент достал копию из шкафа.',
+  enter(){ setDimming(['prog','disk']);
+    clearDesk(); brain.innerHTML='<span class="amnesia">помнит = ничего</span>'; sees.innerHTML='';
+    wband.classList.remove('lit');
+    setTimeout(()=>{ chip(desk,TURN.u); setTimeout(()=>chip(desk,TURN.a),260); }, 550); }
+},
+{ // 7 — песочница: окно vs архив
+  ttl:'Шаг 7 · собери всё вместе',
+  html:'Главное, что путало. Представь длинный разговор — <b>6 ходов в архиве</b>. <b>Окно</b> решает, сколько уйдёт в <span class="hl-model">модель</span>. <b>Хранилище</b> хранит всё. Это два <b>разных</b> вопроса. Подвигай окно — и увидь: модель видит только хвост, а на диске лежит всё всегда.',
+  sandbox:true,
+  enter(){ setDimming(['prog','model','disk']);
+    clearDesk();
+    for(let i=1;i<=6;i++){ chip(desk,{role:'u',who:'ход '+i,text:'…ход '+i+'…'}); }
+    saved=[]; for(let i=1;i<=6;i++){saved.push({role:'u',text:'ход '+i+' (вопрос)'});}
+    store='sql'; showStore();
+    updateSandbox();
+    wband.classList.add('lit'); arrFwd.classList.add('lit');
+  }
+}
+];
+
+/* ── песочница ── */
+function updateSandbox(){
+  const w=+$('wslider').value;
+  $('wval').textContent=w; $('toModel').textContent=w;
+  // подсветим в столе последние w чипов как «в окне»
+  const chips=[...desk.querySelectorAll('.chip')];
+  chips.forEach((c,i)=>{ c.style.outline = i>=chips.length-w ? '2px solid var(--prog)' : 'none';
+    c.style.opacity = i>=chips.length-w ? '1':'.4'; });
+}
+$('wslider').oninput=updateSandbox;
+
+/* ====== Контроллер шагов ====== */
+let i=0, answered={};
+function render(){
+  const s=steps[i];
+  $('stepttl').textContent=s.ttl;
+  $('captext').innerHTML=s.html;
+  $('bar').style.width=(i/(steps.length-1)*100)+'%';
+  $('count').textContent='Шаг '+i+' / '+(steps.length-1);
+  $('prev').disabled = i===0;
+  // предсказание
+  const pred=$('predict'), sb=$('sandbox');
+  pred.style.display='none'; sb.classList.remove('show');
+  $('next').classList.remove('hidden');
+  if(s.enter) s.enter();
+  if(s.predict){
+    pred.style.display='block';
+    $('pq').textContent=s.predict.q;
+    const box=$('popts'); box.innerHTML=''; $('preveal').classList.remove('show');
+    const done=answered[i];
+    s.predict.opts.forEach((o,k)=>{
+      const b=document.createElement('button'); b.textContent=o.t;
+      if(done){ b.disabled=true; if(o.ok)b.classList.add('right'); if(done.pick===k&&!o.ok)b.classList.add('wrong'); }
+      b.onclick=()=>{ answered[i]={pick:k};
+        [...box.children].forEach((bb,kk)=>{bb.disabled=true;
+          if(s.predict.opts[kk].ok)bb.classList.add('right');
+          if(kk===k&&!s.predict.opts[kk].ok)bb.classList.add('wrong');});
+        const rv=$('preveal'); rv.innerHTML=s.predict.reveal; rv.classList.add('show');
+        $('next').classList.remove('hidden');
+      };
+      box.appendChild(b);
+    });
+    if(done){ const rv=$('preveal'); rv.innerHTML=s.predict.reveal; rv.classList.add('show'); }
+    else { $('next').classList.add('hidden'); }   // пока не угадал — прячем «Дальше»
+  }
+  if(s.sandbox){ sb.classList.add('show'); }
+  $('next').textContent = i===steps.length-1 ? 'Заново ↺' : 'Дальше →';
+}
+$('next').onclick=()=>{ if(i===steps.length-1){i=0;answered={};} else i++; render(); };
+$('prev').onclick=()=>{ if(i>0){i--;render();} };
+render();
+</script>
+</body>
+</html>
