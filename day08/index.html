@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Агент со счётчиком токенов · День 8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1d1d1f; --muted:#86868b; --line:#e7e7e4; --bg:#ffffff;
+    --panel:#fbfbf9; --accent:#0071e3; --user:#f3f5f7;
+    --green:#34c759; --green-ink:#0f7a37; --red:#ff3b30; --red-ink:#b3271e;
+    --amber:#ff9f0a; --amber-ink:#9a6200;
+    --serif:"Source Serif 4", Charter, Georgia, "Times New Roman", serif;
+    --sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, sans-serif;
+    --mono:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);
+    font-size:18px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  header{display:flex;align-items:baseline;gap:16px;padding:22px 40px 0}
+  header h1{margin:0;font-weight:600;font-size:25px;letter-spacing:-.015em}
+  header .sub{font-family:var(--sans);color:var(--muted);font-size:13px}
+  header .spacer{flex:1}
+  .btn{font-family:var(--sans);font-size:14px;line-height:1;cursor:pointer;border:1px solid var(--line);
+    background:#fff;color:var(--ink);padding:9px 15px;border-radius:980px;transition:.15s}
+  .btn:hover{border-color:#c7c7cc;background:#fafafa}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary:hover{background:#0063c8}
+  .btn-danger{background:#fff;color:var(--red-ink);border-color:#f0c8c4}
+  .btn-danger:hover{background:#fff5f4}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:4px 40px 0}
+  /* вкладки */
+  nav.tabs{display:flex;gap:4px;padding:12px 40px 0;border-bottom:1px solid var(--line)}
+  nav.tabs button{font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;border:0;
+    background:none;color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .page{display:none;height:calc(100vh - 132px)}
+  .page.on{display:flex}
+  /* ── ЧАТ ── */
+  .col-chat{flex:1;display:flex;flex-direction:column;min-width:0}
+  .transcript{flex:1;overflow:auto;padding:24px 40px}
+  .empty{max-width:560px;margin:7vh auto 0;text-align:center;color:var(--muted);font-size:17px;line-height:1.55}
+  .msg{margin:0 auto 20px;max-width:680px}
+  .msg .who{font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .msg.user .bubble{background:var(--user);border-radius:16px;padding:11px 15px;display:inline-block}
+  .bubble{white-space:pre-wrap;word-wrap:break-word}
+  .composer{display:flex;gap:12px;align-items:flex-end;padding:14px 40px;border-top:1px solid var(--line)}
+  textarea#input{flex:1;font-family:var(--serif);font-size:17px;line-height:1.4;border:1px solid var(--line);
+    border-radius:16px;padding:12px 15px;resize:none;max-height:140px;outline:none;color:var(--ink)}
+  textarea#input:focus{border-color:var(--accent)}
+  /* счётчик токенов справа */
+  aside.meter{width:42%;max-width:520px;border-left:1px solid var(--line);background:var(--panel);overflow:auto;
+    padding:24px 26px;font-family:var(--sans)}
+  aside.meter h2,.card h2{font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+  .gauge{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-top:1px solid var(--line)}
+  .gauge:first-of-type{border-top:0}
+  .gauge .k{color:var(--muted);font-size:13.5px}
+  .gauge .v{font-family:var(--mono);font-size:15px;color:var(--ink)}
+  .gauge .v small{color:var(--muted);font-size:12px}
+  .bar{height:10px;border-radius:6px;background:#ececec;overflow:hidden;margin:8px 0 4px}
+  .bar > i{display:block;height:100%;background:var(--accent)}
+  .hint{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:6px}
+  .hint b{color:var(--ink);font-weight:600}
+  .pill{display:inline-block;font-family:var(--sans);font-size:11px;font-weight:600;padding:2px 8px;border-radius:980px}
+  .pill.ok{background:#e9faef;color:var(--green-ink)} .pill.bad{background:#fdecea;color:var(--red-ink)}
+  /* ── РОСТ ── */
+  .scroll{flex:1;overflow:auto;padding:26px 40px;width:100%}
+  table.ledger{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:13.5px;
+    background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:880px}
+  table.ledger th,table.ledger td{text-align:right;padding:9px 12px;border-top:1px solid var(--line)}
+  table.ledger th{background:#f4f4f1;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-top:0}
+  table.ledger td.t,table.ledger th.t{text-align:left}
+  .growbars{max-width:880px;margin:22px 0}
+  .growrow{display:flex;align-items:center;gap:10px;margin:4px 0;font-family:var(--mono);font-size:12px}
+  .growrow .lbl{width:54px;color:var(--muted);text-align:right}
+  .growrow .track{flex:1;background:#ececec;border-radius:5px;height:16px;overflow:hidden}
+  .growrow .track > i{display:block;height:100%;background:var(--accent)}
+  .growrow .num{width:64px;color:var(--ink)}
+  .note{font-family:var(--sans);font-size:13.5px;color:var(--muted);line-height:1.55;max-width:760px;margin-top:8px}
+  .note b{color:var(--ink);font-weight:600}
+  /* ── ПОЛОМКА ── */
+  .breakwrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1100px}
+  .card{border:1px solid var(--line);border-radius:14px;padding:20px 22px;background:#fff}
+  .card p{font-family:var(--sans);font-size:13.5px;color:var(--muted);line-height:1.55;margin:0 0 14px}
+  pre.err{font-family:var(--mono);font-size:12px;line-height:1.5;background:#fdf6f5;border:1px solid #f0d2ce;
+    color:#7a241c;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;margin:8px 0 0}
+  .panel{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin:10px 0;background:var(--panel)}
+  .panel .ttl{font-family:var(--sans);font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .panel .reply{font-size:15px;margin-top:7px;white-space:pre-wrap}
+  .panel .glass{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:8px}
+  .spin{font-family:var(--sans);font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Агент со счётчиком токенов</h1>
+    <span class="sub">День 8 · токены, цена, переполнение окна</span>
+    <span class="spacer"></span>
+    <button class="btn" id="clear">Стереть память</button>
+  </header>
+  <div class="meta" id="meta">…</div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="chat" class="on">Чат + счётчик</button>
+    <button data-tab="grow">Рост</button>
+    <button data-tab="break">Поломка</button>
+  </nav>
+
+  <!-- ───────────── ЧАТ ───────────── -->
+  <section class="page on" id="page-chat">
+    <div class="col-chat">
+      <div class="transcript" id="transcript"></div>
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Сообщение…  (Enter — отправить). Поговорите 5–6 ходов и смотрите, как растёт «вход»."></textarea>
+        <button class="btn btn-primary" id="send">Отправить</button>
+      </div>
+    </div>
+    <aside class="meter">
+      <h2>📊 Счётчик токенов · последний ход</h2>
+      <div id="meterBody"><div class="hint">Отправьте сообщение — здесь появится разбор токенов этого хода.</div></div>
+    </aside>
+  </section>
+
+  <!-- ───────────── РОСТ ───────────── -->
+  <section class="page" id="page-grow">
+    <div class="scroll" id="growBody"></div>
+  </section>
+
+  <!-- ───────────── ПОЛОМКА ───────────── -->
+  <section class="page" id="page-break">
+    <div class="scroll">
+      <div class="breakwrap">
+        <div class="card">
+          <h2>🧱 Сценарий А · жёсткий стоп</h2>
+          <p>Шлём заведомо огромный промпт (≈847 000 токенов) в окно 131 072. На нашем стеке
+             (OpenRouter + Chat Completions) окно <b>не обрезается молча</b> — сервер честно
+             отказывает ошибкой <b>400</b>. Это реальный ответ API, не выдумка страницы.</p>
+          <button class="btn btn-danger" id="btnOverflow">Переполнить окно →</button>
+          <div id="overflowOut"></div>
+        </div>
+        <div class="card">
+          <h2>🫥 Сценарий Б · потеря контекста</h2>
+          <p>Сажаем факт в начало разговора, забиваем окно наполнителем, и на один и тот же
+             выпавший факт смотрим три поведения. <b>Инвариант:</b> факт в окне → верно;
+             факт выпал → не верно (то отказ, то уверенная <b>выдумка</b> — варьируется).</p>
+          <button class="btn btn-danger" id="btnForget">Засадить факт и потерять его →</button>
+          <div id="forgetOut"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script>
+  const $ = s => document.querySelector(s);
+  let S = null;
+
+  // ── вкладки ──
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+    ["chat","grow","break"].forEach(t => $("#page-"+t).classList.toggle("on", t === b.dataset.tab));
+    if(b.dataset.tab === "grow") renderGrow();
+  });
+
+  function fmtCost(x){ return "$" + (x ?? 0).toFixed(6); }
+  function escapeHtml(s){ return (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+  function addMsg(who, text){
+    const m = document.createElement("div");
+    m.className = "msg " + (who === "user" ? "user" : "bot");
+    const w = document.createElement("div"); w.className = "who";
+    w.textContent = who === "user" ? "Вы" : "Ассистент";
+    const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+    m.appendChild(w); m.appendChild(b);
+    $("#transcript").appendChild(m); $("#transcript").scrollTop = 1e9;
+    return b;
+  }
+  function renderTranscript(history){
+    const t = $("#transcript"); t.innerHTML = "";
+    if(!history.length){
+      t.innerHTML = '<div class="empty">Память пуста — новый разговор.<br>'
+        + 'Назовите модели какой-нибудь факт (имя, число), поговорите несколько ходов,'
+        + ' а потом откройте вкладки <b>Рост</b> и <b>Поломка</b>.</div>';
+      return;
+    }
+    history.forEach(m => addMsg(m.role === "user" ? "user" : "bot", m.content));
+  }
+
+  // ── счётчик токенов (последний ход) ──
+  function renderMeter(){
+    const body = $("#meterBody");
+    if(!S.ledger.length){
+      body.innerHTML = '<div class="hint">Отправьте сообщение — здесь появится разбор токенов этого хода.</div>';
+      return;
+    }
+    const r = S.ledger[S.ledger.length - 1], u = r.usage;
+    const pct = Math.min(100, 100 * (u.total_tokens || 0) / r.window);
+    const gap = (u.prompt_tokens || 0) - (r.estimate_sent || 0);
+    let h = "";
+    h += gauge("вход — вся история", u.prompt_tokens, "то, что реально ушло в модель");
+    h += `<div class="hint">наша локальная прикидка входа: <b>${r.estimate_sent}</b> ток.
+          → сервер насчитал на <b>${gap}</b> больше: это скрытый служебный пролог harmony
+          (кто ты, дата, правила) — его добавляет провайдер, мы его не пишем. Точный счёт знает только сервер.</div>`;
+    let outExtra = [];
+    if(u.reasoning_tokens) outExtra.push(`«мыслей»: ${u.reasoning_tokens}`);
+    if(u.cached_tokens) outExtra.push(`из кэша входа: ${u.cached_tokens}`);
+    h += gauge("выход — ответ модели", u.completion_tokens, outExtra.join(" · "));
+    h += gauge("всего за ход", u.total_tokens, `${pct.toFixed(2)}% окна (${u.total_tokens}/${r.window})`);
+    h += `<div class="bar"><i style="width:${pct}%"></i></div>`;
+    h += gauge("«как если бы» цена хода", fmtCost(r.as_if_cost), `тариф ${S.price_in}/${S.price_out} за 1M`);
+    h += gauge("нарастающим итогом", fmtCost(r.cumulative_cost), "сумма по всем ходам сессии");
+    body.innerHTML = h;
+  }
+  function gauge(k, v, sub){
+    return `<div class="gauge"><span class="k">${k}</span>`
+      + `<span class="v">${v}${sub ? ` <small>· ${sub}</small>` : ""}</span></div>`;
+  }
+
+  // ── вкладка РОСТ ──
+  function renderGrow(){
+    const body = $("#growBody");
+    if(!S.ledger.length){ body.innerHTML = '<div class="note">Пока нет ходов. Поговорите во вкладке «Чат» — и вернитесь сюда.</div>'; return; }
+    const L = S.ledger;
+    let rows = L.map(r => `<tr><td class="t">${r.turn}</td><td>${r.usage.prompt_tokens}</td>`
+      + `<td>${r.usage.completion_tokens}</td><td>${r.usage.total_tokens}</td>`
+      + `<td>${fmtCost(r.cumulative_cost)}</td></tr>`).join("");
+    const maxIn = Math.max(...L.map(r => r.usage.prompt_tokens));
+    let bars = L.map(r => {
+      const w = 100 * r.usage.prompt_tokens / maxIn;
+      return `<div class="growrow"><span class="lbl">ход ${r.turn}</span>`
+        + `<span class="track"><i style="width:${w}%"></i></span>`
+        + `<span class="num">${r.usage.prompt_tokens}</span></div>`;
+    }).join("");
+    body.innerHTML = `
+      <h2 style="font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)">Бухгалтерия по ходам</h2>
+      <table class="ledger"><tr><th class="t">ход</th><th>вход</th><th>выход</th><th>всего</th><th>нараст. цена</th></tr>${rows}</table>
+      <div class="growbars">${bars}</div>
+      <div class="note"><b>Что видно:</b> колонка «вход» растёт каждый ход — мы пересылаем всю историю заново
+        (модель stateless). За слово, сказанное на 1-м ходу, платим снова на каждом следующем — отсюда
+        квадратичный рост стоимости. Когда история упрётся в окно агента (у нас скользящее окно последних ходов),
+        «вход» перестанет расти — но ценой того, что старые сообщения <b>выпадут</b> из окна. Ровно это
+        и ломает поведение во вкладке «Поломка».</div>`;
+  }
+
+  // ── вкладка ПОЛОМКА ──
+  $("#btnOverflow").onclick = async () => {
+    const out = $("#overflowOut"); out.innerHTML = '<div class="spin">шлём огромный промпт…</div>';
+    const r = await (await fetch("/api/overflow", {method:"POST"})).json();
+    if(r.ok){ out.innerHTML = '<div class="hint">неожиданно прошло без ошибки.</div>'; return; }
+    out.innerHTML = `<div class="hint">Прикидка запроса: <b>${r.estimate.toLocaleString()}</b> ток. · окно модели: <b>${r.window.toLocaleString()}</b> ток.</div>`
+      + `<pre class="err">${escapeHtml(r.error)}</pre>`
+      + `<div class="hint">Заметьте: в тексте ошибки «requested … (X of text input, Y in the output)» —
+         лимит проверяется как <b>вход + бронь под ответ</b>. Это и есть «что ломается»: запрос не выполняется вовсе.</div>`;
+  };
+  $("#btnForget").onclick = async () => {
+    const out = $("#forgetOut"); out.innerHTML = '<div class="spin">сажаю факт, забиваю окно, делаю 3 вызова…</div>';
+    const r = await (await fetch("/api/forget", {method:"POST"})).json();
+    const panel = p => {
+      const ok = p.correct;
+      return `<div class="panel"><div class="ttl"><span>${p.label}</span>`
+        + `<span class="pill ${ok?'ok':'bad'}">${ok?'✓ верно':'✗ факт потерян'}</span></div>`
+        + `<div class="reply">${escapeHtml(p.reply.trim())}</div>`
+        + `<div class="glass">факт «${escapeHtml(r.number)}» в том, что ушло в модель: <b>${p.fact_present?'да':'нет'}</b></div></div>`;
+    };
+    out.innerHTML = `<div class="hint">Спрятанный факт: <b>${escapeHtml(r.fact)}</b>. Узкое окно = последние ${r.window_turns} ходов.</div>`
+      + panel(r.full) + panel(r.window_ask) + panel(r.window_form)
+      + `<div class="hint">Та же модель, тот же выпавший факт. Виден факт → отвечает верно.
+         Выпал → не может: то честно «не знаю», то уверенно <b>выдумывает</b> (конфабуляция). Ответы живые — между запусками меняются.</div>`;
+  };
+
+  // ── общее состояние ──
+  function apply(st){
+    S = st;
+    $("#meta").textContent = `модель: ${st.model}  ·  токенайзер прикидки: ${st.encoder}  ·  окно: ${st.window.toLocaleString()} ток.  ·  «как если бы» тариф: $${st.price_in}/$${st.price_out} за 1M (вход/выход)`;
+    renderTranscript(st.history);
+    renderMeter();
+  }
+  fetch("/api/state").then(r => r.json()).then(apply);
+
+  async function send(){
+    const input = $("#input"), text = input.value.trim();
+    if(!text) return;
+    addMsg("user", text); input.value = ""; autoGrow(input);
+    const bubble = addMsg("bot", "…");
+    try{
+      const data = await (await fetch("/api/chat", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({message:text})
+      })).json();
+      bubble.textContent = data.reply;
+      S = data; renderMeter();
+    }catch(e){ bubble.textContent = "[ошибка сети: " + e + "]"; }
+  }
+  function autoGrow(t){ t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }
+  $("#send").onclick = send;
+  $("#input").addEventListener("input", e => autoGrow(e.target));
+  $("#input").addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
+  $("#clear").onclick = async () => apply(await (await fetch("/api/clear", {method:"POST"})).json());
+</script>
+</body>
+</html>
