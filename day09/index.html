@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Агент со сжатием истории · День 9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1d1d1f; --muted:#86868b; --line:#e7e7e4; --bg:#ffffff;
+    --panel:#fbfbf9; --accent:#0071e3; --user:#f3f5f7;
+    --green:#34c759; --green-ink:#0f7a37; --red:#ff3b30; --red-ink:#b3271e;
+    --amber:#ff9f0a; --amber-ink:#9a6200;
+    --serif:"Source Serif 4", Charter, Georgia, "Times New Roman", serif;
+    --sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, sans-serif;
+    --mono:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);
+    font-size:18px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  header{display:flex;align-items:center;gap:16px;padding:22px 40px 0}
+  header h1{margin:0;font-weight:600;font-size:25px;letter-spacing:-.015em}
+  header .sub{font-family:var(--sans);color:var(--muted);font-size:13px}
+  header .spacer{flex:1}
+  .btn{font-family:var(--sans);font-size:14px;line-height:1;cursor:pointer;border:1px solid var(--line);
+    background:#fff;color:var(--ink);padding:9px 15px;border-radius:980px;transition:.15s}
+  .btn:hover{border-color:#c7c7cc;background:#fafafa}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary:hover{background:#0063c8}
+  .btn-danger{background:#fff;color:var(--red-ink);border-color:#f0c8c4}
+  .btn-danger:hover{background:#fff5f4}
+  /* тумблер сжатия */
+  .switch{display:flex;align-items:center;gap:9px;font-family:var(--sans);font-size:13.5px;color:var(--ink)}
+  .switch .track{width:42px;height:24px;border-radius:980px;background:#d2d2d7;position:relative;transition:.18s;cursor:pointer}
+  .switch .track.on{background:var(--green)}
+  .switch .track > i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch .track.on > i{left:20px}
+  .switch .lab{min-width:128px}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:6px 40px 0}
+  nav.tabs{display:flex;gap:4px;padding:12px 40px 0;border-bottom:1px solid var(--line)}
+  nav.tabs button{font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;border:0;
+    background:none;color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .page{display:none;height:calc(100vh - 150px)}
+  .page.on{display:flex}
+  /* ── ЧАТ ── */
+  .col-chat{flex:1;display:flex;flex-direction:column;min-width:0}
+  .transcript{flex:1;overflow:auto;padding:24px 40px}
+  .empty{max-width:600px;margin:6vh auto 0;text-align:center;color:var(--muted);font-size:16px;line-height:1.6}
+  .empty b{color:var(--ink)}
+  .msg{margin:0 auto 20px;max-width:680px}
+  .msg .who{font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .msg.user .bubble{background:var(--user);border-radius:16px;padding:11px 15px;display:inline-block}
+  .bubble{white-space:pre-wrap;word-wrap:break-word}
+  .composer{display:flex;gap:12px;align-items:flex-end;padding:14px 40px;border-top:1px solid var(--line)}
+  textarea#input{flex:1;font-family:var(--serif);font-size:17px;line-height:1.4;border:1px solid var(--line);
+    border-radius:16px;padding:12px 15px;resize:none;max-height:140px;outline:none;color:var(--ink)}
+  textarea#input:focus{border-color:var(--accent)}
+  /* капот справа */
+  aside.hood{width:46%;max-width:560px;border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:22px 24px;font-family:var(--sans)}
+  aside.hood h2{font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  .lede{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px}
+  .slot{border:1px solid var(--line);border-radius:12px;background:#fff;margin:0 0 12px;overflow:hidden}
+  .slot .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 13px;font-size:12px;font-weight:600;border-bottom:1px solid var(--line)}
+  .slot .head .tag{font-family:var(--sans);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .slot.role .head{background:#f4f4f1}
+  .slot.summary .head{background:#fff8ec;color:var(--amber-ink)}
+  .slot.window .head{background:#eef6ff;color:#0a4a99}
+  .slot .body{padding:11px 13px;font-size:13.5px;line-height:1.5}
+  .slot .body.mono{font-family:var(--mono);font-size:12px;color:#555}
+  .slot.summary .body{font-family:var(--serif);font-size:14px;color:var(--ink)}
+  .turnrow{padding:6px 0;border-top:1px dashed var(--line)}
+  .turnrow:first-child{border-top:0}
+  .turnrow .r{font-family:var(--sans);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .turnrow .c{font-size:13px;white-space:pre-wrap}
+  .gauge{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+  .gauge:first-of-type{border-top:0}
+  .gauge .k{color:var(--muted);font-size:13px}
+  .gauge .v{font-family:var(--mono);font-size:15px;color:var(--ink)}
+  .gauge .v small{color:var(--muted);font-size:11.5px}
+  .empty-slot{color:var(--muted);font-size:13px;font-style:italic}
+  /* пила входа */
+  .saw{margin-top:14px}
+  .sawbars{display:flex;align-items:flex-end;gap:3px;height:84px;border-bottom:1px solid var(--line);padding-bottom:0}
+  .sawbars .b{flex:1;min-width:5px;border-radius:3px 3px 0 0}
+  .sawbars .b.on{background:var(--green)} .sawbars .b.off{background:var(--accent)}
+  .sawleg{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:middle;margin-right:4px}
+  .dot.on{background:var(--green)} .dot.off{background:var(--accent)}
+  /* ── СРАВНЕНИЕ ── */
+  .scroll{flex:1;overflow:auto;padding:26px 40px;width:100%}
+  .cmpgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:1180px;margin-top:16px}
+  .hero{border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+  .hero .top{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .hero .top .name{font-family:var(--sans);font-weight:600;font-size:15px}
+  .hero .top .desc{font-family:var(--sans);font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .hero .verdict{padding:12px 16px;display:flex;align-items:center;gap:9px;font-family:var(--sans);font-size:14px;font-weight:600;border-bottom:1px solid var(--line)}
+  .hero .verdict.ok{background:#e9faef;color:var(--green-ink)} .hero .verdict.bad{background:#fdecea;color:var(--red-ink)}
+  .hero .rows{padding:6px 16px 12px}
+  .hero .rw{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-family:var(--sans);font-size:13px}
+  .hero .rw:first-child{border-top:0}
+  .hero .rw .k{color:var(--muted)} .hero .rw .v{font-family:var(--mono);font-size:13px}
+  .hero .ans{padding:0 16px 14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+  .hero .cop{margin:0 16px 14px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:12.5px;color:#444;line-height:1.5}
+  .pill{display:inline-block;font-family:var(--sans);font-size:11px;font-weight:600;padding:2px 8px;border-radius:980px}
+  .pill.ok{background:#e9faef;color:var(--green-ink)} .pill.bad{background:#fdecea;color:var(--red-ink)}
+  .note{font-family:var(--sans);font-size:13.5px;color:var(--muted);line-height:1.6;max-width:900px;margin-top:18px}
+  .note b{color:var(--ink);font-weight:600}
+  .spin{font-family:var(--sans);font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Агент со сжатием истории</h1>
+    <span class="sub">День 9 · последние N дословно + копилка‑summary вместо полной истории</span>
+    <span class="spacer"></span>
+    <div class="switch">
+      <span class="lab" id="swLab">Сжатие: выкл</span>
+      <div class="track" id="swTrack"><i></i></div>
+    </div>
+    <button class="btn" id="clear">Стереть</button>
+  </header>
+  <div class="meta" id="meta">…</div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="chat" class="on">Чат + капот</button>
+    <button data-tab="cmp">Сравнение без/со сжатия</button>
+  </nav>
+
+  <!-- ───────────── ЧАТ ───────────── -->
+  <section class="page on" id="page-chat">
+    <div class="col-chat">
+      <div class="transcript" id="transcript"></div>
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Сообщение…  (Enter — отправить). Назовите факт в начале, поговорите 4–5 ходов с включённым сжатием — и смотрите справа, как старое уезжает в копилку."></textarea>
+        <button class="btn btn-primary" id="send">Отправить</button>
+      </div>
+    </div>
+    <aside class="hood">
+      <h2>🔍 Что реально уходит в модель</h2>
+      <p class="lede">Это <b>весь</b> контекст последнего хода. При сжатии полная история не шлётся — её заменяют два отсека: <b>копилка</b> (старое в выжимке) + <b>окно</b> (свежее дословно).</p>
+      <div id="hoodBody"><div class="empty-slot">Отправьте сообщение — здесь появится разбор.</div></div>
+    </aside>
+  </section>
+
+  <!-- ───────────── СРАВНЕНИЕ ───────────── -->
+  <section class="page" id="page-cmp">
+    <div class="scroll">
+      <h2 style="font-family:var(--sans);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0">Сравнение на одном диалоге</h2>
+      <p class="note" style="margin-top:8px">В начале диалога клиент диктует факт (проект «Гриффин», <b>№4471</b>, дедлайн 14 марта), затем нейтральный трёп выталкивает его за окно. В конце спрашиваем про факт. Прогоняем один и тот же диалог через три режима. <b>Вызовы реальные</b> — займёт ~10–20 сек.</p>
+      <button class="btn btn-primary" id="btnCmp" style="margin-top:10px">Прогнать сравнение →</button>
+      <div id="cmpOut"></div>
+    </div>
+  </section>
+
+<script>
+  const $ = s => document.querySelector(s);
+  let S = null, COMPRESS = false;
+
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+    ["chat","cmp"].forEach(t => $("#page-"+t).classList.toggle("on", t === b.dataset.tab));
+  });
+
+  function escapeHtml(s){ return (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+  // ── тумблер сжатия ──
+  function renderSwitch(){
+    $("#swTrack").classList.toggle("on", COMPRESS);
+    $("#swLab").textContent = "Сжатие: " + (COMPRESS ? "вкл" : "выкл");
+  }
+  $("#swTrack").onclick = () => { COMPRESS = !COMPRESS; renderSwitch(); };
+
+  // ── чат ──
+  function addMsg(who, text){
+    const m = document.createElement("div");
+    m.className = "msg " + (who === "user" ? "user" : "bot");
+    const w = document.createElement("div"); w.className = "who";
+    w.textContent = who === "user" ? "Вы" : "Ассистент";
+    const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+    m.appendChild(w); m.appendChild(b);
+    $("#transcript").appendChild(m); $("#transcript").scrollTop = 1e9;
+    return b;
+  }
+  function renderTranscript(history){
+    const t = $("#transcript"); t.innerHTML = "";
+    if(!history.length){
+      t.innerHTML = '<div class="empty"><b>Память пуста — новый разговор.</b><br>'
+        + 'Включите тумблер <b>Сжатие</b> вверху, назовите ассистенту факт (имя, число),'
+        + ' поговорите 4–5 ходов на любые темы, а затем спросите про факт.<br>'
+        + 'Справа в «капоте» видно, как старое сворачивается в <b>копилку</b>, а свежее остаётся в <b>окне</b> дословно.</div>';
+      return;
+    }
+    history.forEach(m => addMsg(m.role === "user" ? "user" : "bot", m.content));
+  }
+
+  // ── капот: роль / копилка / окно + вход + пила ──
+  function renderHood(){
+    const body = $("#hoodBody");
+    const e = S.envelope;
+    if(!S.history.length || !e || !e.sent_count){
+      body.innerHTML = '<div class="empty-slot">Отправьте сообщение — здесь появится разбор.</div>';
+      return;
+    }
+    let h = "";
+    // РОЛЬ
+    h += `<div class="slot role"><div class="head"><span>Роль (system)</span><span class="tag">всегда</span></div>`
+       + `<div class="body mono">${escapeHtml(e.role_prompt)}</div></div>`;
+    // КОПИЛКА
+    if(e.summary){
+      h += `<div class="slot summary"><div class="head"><span>📦 Копилка (summary)</span>`
+         + `<span class="tag">свёрнуто ${e.folded} сообщ. · сжатий: ${e.summarizations}</span></div>`
+         + `<div class="body">${escapeHtml(e.summary)}</div></div>`;
+    } else {
+      h += `<div class="slot summary"><div class="head"><span>📦 Копилка (summary)</span><span class="tag">пока пусто</span></div>`
+         + `<div class="body"><span class="empty-slot">Ещё нечего сворачивать — старое не вышло за окно (или сжатие выключено).</span></div></div>`;
+    }
+    // ОКНО
+    let win = (e.window || []).map(m =>
+      `<div class="turnrow"><div class="r">${m.role === "user" ? "Вы" : "Ассистент"}</div><div class="c">${escapeHtml(m.content)}</div></div>`).join("");
+    h += `<div class="slot window"><div class="head"><span>🪟 Окно — последние реплики дословно</span>`
+       + `<span class="tag">${(e.window||[]).length} из ${e.keep_last}+ </span></div><div class="body">${win || '<span class="empty-slot">пусто</span>'}</div></div>`;
+    // вход за ход
+    h += `<div class="gauge"><span class="k">вход за этот ход</span><span class="v">${e.input_tokens_real ?? "—"} <small>· токенов реально в модель</small></span></div>`;
+    h += `<div class="gauge"><span class="k">режим хода</span><span class="v">${S.compress ? "со сжатием" : "без сжатия"}</span></div>`;
+    // пила входа по ходам
+    h += renderSaw();
+    body.innerHTML = h;
+  }
+
+  function renderSaw(){
+    const L = S.ledger || [];
+    if(L.length < 2) return "";
+    const max = Math.max(...L.map(r => r.usage.prompt_tokens || 0)) || 1;
+    const bars = L.map(r => {
+      const on = (r.summary_tokens || 0) > 0 || false; // ход, где было сжатие — другого цвета не делаем, цвет по режиму ниже
+      const ht = Math.max(4, 100 * (r.usage.prompt_tokens || 0) / max);
+      return `<div class="b ${r.summary_tokens>0?'on':'off'}" style="height:${ht}%" title="ход ${r.turn}: ${r.usage.prompt_tokens} ток."></div>`;
+    }).join("");
+    return `<div class="saw"><h2>Вход по ходам — растёт или «пила»?</h2><div class="sawbars">${bars}</div>`
+      + `<div class="sawleg"><span class="dot off"></span>обычный ход · <span class="dot on"></span>ход, где сработало сжатие (старое свёрнуто). `
+      + `Без сжатия столбики только растут; со сжатием на свёртке проваливаются вниз.</div></div>`;
+  }
+
+  // ── сравнение ──
+  $("#btnCmp").onclick = async () => {
+    const out = $("#cmpOut");
+    out.innerHTML = '<div class="spin" style="margin-top:14px">Гоняю один диалог через три режима (реальные вызовы)…</div>';
+    let r;
+    try{ r = await (await fetch("/api/compare", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"})).json(); }
+    catch(e){ out.innerHTML = '<div class="spin">[ошибка: '+e+']</div>'; return; }
+    const meta = {
+      plain:{name:"Без сжатия", desc:"вся история в модель каждый ход"},
+      smart:{name:"Сжатие + guardrail", desc:"копилка велит хранить имена/числа/даты"},
+      naive:{name:"Сжатие наивное", desc:"копилка просто «кратко перескажи»"},
+    };
+    const card = (key) => {
+      const h = r.heroes[key], m = meta[key], ok = h.fact_recalled;
+      return `<div class="hero">
+        <div class="top"><div class="name">${m.name}</div><div class="desc">${m.desc}</div></div>
+        <div class="verdict ${ok?'ok':'bad'}">${ok?'✓ факт сохранён':'✗ факт потерян'}</div>
+        <div class="rows">
+          <div class="rw"><span class="k">факт был во входе</span><span class="v">${h.fact_in_payload?'да':'нет'}</span></div>
+          <div class="rw"><span class="k">вход финального хода</span><span class="v">${h.final_input_real ?? '—'} ток.</span></div>
+          <div class="rw"><span class="k">суммаризаций</span><span class="v">${h.summarizations}</span></div>
+          <div class="rw"><span class="k">цена сжатия</span><span class="v">${h.summary_tokens_real} ток.</span></div>
+        </div>
+        <div class="ans"><b style="font-family:var(--sans);font-size:12px;color:var(--muted)">ОТВЕТ НА «ВСПОМНИ»:</b><br>${escapeHtml(h.reply)}</div>
+        ${h.summary ? `<div class="cop"><b>копилка:</b> ${escapeHtml(h.summary)}</div>`:''}
+      </div>`;
+    };
+    out.innerHTML = `<div class="cmpgrid">${card('plain')}${card('smart')}${card('naive')}</div>`
+      + `<div class="note"><b>Что показывает демо:</b> сжатие <b>сохраняет</b> факт, только если копилке велено хранить конкретику (smart).
+         Плохая инструкция (naive) даёт ту же экономию токенов, но <b>теряет</b> число — и модель уверенно его <b>выдумывает</b>.
+         Вывод: качество сжатия меряют не размером копилки, а тем, выжили ли в ней важные факты.</div>`;
+  };
+
+  // ── общее ──
+  function apply(st, compressFlag){
+    S = st;
+    if(typeof compressFlag === "boolean") COMPRESS = compressFlag;
+    $("#meta").textContent = `модель: ${st.model}  ·  окно копилки keep_last=${st.keep_last} реплик  ·  триггер сжатия=${st.trigger}  ·  контекстное окно модели: ${st.window.toLocaleString()} ток.`;
+    renderSwitch();
+    renderTranscript(st.history);
+    renderHood();
+  }
+  fetch("/api/state").then(r => r.json()).then(st => apply(st));
+
+  async function send(){
+    const input = $("#input"), text = input.value.trim();
+    if(!text) return;
+    addMsg("user", text); input.value = ""; autoGrow(input);
+    const bubble = addMsg("bot", "…");
+    try{
+      const data = await (await fetch("/api/chat", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({message:text, compress: COMPRESS})
+      })).json();
+      bubble.textContent = data.reply;
+      apply(data);
+    }catch(e){ bubble.textContent = "[ошибка сети: " + e + "]"; }
+  }
+  function autoGrow(t){ t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }
+  $("#send").onclick = send;
+  $("#input").addEventListener("input", e => autoGrow(e.target));
+  $("#input").addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
+  $("#clear").onclick = async () => apply(await (await fetch("/api/clear", {method:"POST"})).json());
+</script>
+</body>
+</html>

@@ -26,3 +26,9 @@ memory.json
 memory.db
 *.sqlite
 *.sqlite3
+
+# Временные пробники/раннеры (живут локально, в репозиторий не идут):
+# _*.py — черновые скрипты (_run, _exp, _smoke), probe/ping — разовые зонды API
+_*.py
+probe.py
+ping.py
