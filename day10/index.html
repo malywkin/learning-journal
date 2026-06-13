@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Управление контекстом · три стратегии · День 10</title>
+<style>
+  :root{
+    --bg:#fbfbfa; --panel:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e7e7e4;
+    --accent:#1a6fd4; --drop:#b9b9b6; --good:#1c8a4b; --bad:#c0392b;
+    --card:#f4f8ff; --cardline:#cfe0fb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1{font-size:23px;font-weight:600;letter-spacing:-.02em;margin:0}
+  .sub{color:var(--muted);font-size:13.5px}
+  .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:#fff}
+
+  /* переключатель стратегий */
+  .switch{display:flex;gap:6px;margin:22px 0 6px;background:#efefec;border-radius:12px;padding:5px;width:max-content}
+  .switch button{border:0;background:transparent;color:var(--muted);font-size:14.5px;font-weight:550;
+    padding:8px 16px;border-radius:8px;cursor:pointer;transition:.15s}
+  .switch button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .desc{color:var(--muted);font-size:13.5px;margin:4px 2px 18px;min-height:20px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px}
+  .panel h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}
+
+  /* чат */
+  .chat{display:flex;flex-direction:column;height:460px}
+  .msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:9px;padding-right:4px}
+  .m{max-width:84%;padding:8px 12px;border-radius:13px;font-size:14.5px;white-space:pre-wrap;word-wrap:break-word}
+  .m.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .m.assistant{align-self:flex-start;background:#f1f1ef;border-bottom-left-radius:4px}
+  .composer{display:flex;gap:8px;margin-top:12px}
+  .composer input{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14.5px;outline:none}
+  .composer input:focus{border-color:var(--accent)}
+  button.go{border:0;background:var(--accent);color:#fff;border-radius:10px;padding:0 16px;font-size:14.5px;font-weight:600;cursor:pointer}
+  button.go:disabled{opacity:.5;cursor:default}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer}
+
+  /* капот */
+  .slot{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:9px;background:#fcfcfb}
+  .slot .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px}
+  .role{color:#7a4ed8}
+  .line{font-size:13.5px;white-space:pre-wrap;word-wrap:break-word}
+  .line.r-user{color:var(--accent)}
+  .line.r-assistant{color:var(--ink)}
+  .line.dropped{color:var(--drop);text-decoration:line-through}
+  .cardbox{background:var(--card);border:1px solid var(--cardline);border-radius:10px;padding:9px 11px;margin-bottom:9px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13.5px}
+  .kv .k{color:var(--muted)}
+  .toks{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin-top:4px}
+  .toks b{color:var(--ink);font-weight:600}
+
+  /* ветки */
+  .branchbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 12px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted)}
+  .chip.on{border-color:var(--accent);color:var(--accent);background:#f3f8ff;font-weight:600}
+  .tree .trunk{border-left:3px solid var(--accent);padding-left:11px;margin-left:6px}
+  .tree .fork{border-left:2px dashed var(--cardline);padding-left:11px;margin:6px 0 6px 18px}
+  .tree .fork.on{border-left-color:var(--accent)}
+  .mini{font-size:13px;color:var(--ink)}
+  .mini.muted{color:var(--muted)}
+
+  /* сравнение */
+  .cmp{margin-top:18px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .yes{color:var(--good);font-weight:600}.no{color:var(--bad);font-weight:600}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Управление контекстом · три стратегии</h1>
+      <div class="sub">День 10 — без summary: что делать со старым контекстом</div>
+    </div>
+    <span class="badge" id="badge">модель…</span>
+  </header>
+
+  <div class="switch" id="switch">
+    <button data-m="window" class="on">🪟 Окно</button>
+    <button data-m="facts">🗂 Facts</button>
+    <button data-m="branch">🌿 Ветки</button>
+  </div>
+  <div class="desc" id="desc"></div>
+
+  <div class="grid">
+    <!-- ЛЕВО: чат -->
+    <div class="panel chat">
+      <h2>Диалог <button class="ghost" style="float:right" onclick="clearAll()">очистить</button></h2>
+
+      <div id="branchbar" class="branchbar" style="display:none"></div>
+
+      <div class="msgs" id="msgs"></div>
+      <div class="composer">
+        <input id="inp" placeholder="Сообщение…" autocomplete="off">
+        <button class="go" id="send" onclick="send()">→</button>
+      </div>
+    </div>
+
+    <!-- ПРАВО: капот -->
+    <div class="panel">
+      <h2>Что уходит в модель <span id="cut" style="float:right;font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
+      <div id="hood"></div>
+      <div class="toks" id="toks"></div>
+    </div>
+  </div>
+
+  <!-- СРАВНЕНИЕ -->
+  <div class="panel cmp">
+    <h2>Сравнение: окно vs facts на сборе ТЗ
+      <button class="ghost" style="float:right" id="cmpbtn" onclick="runCompare()">прогнать</button></h2>
+    <div id="cmpout" class="hint">Один сценарий (бюджет 500 000 ₽, дедлайн 14 марта в начале → болтовня про дизайн → «напомни бюджет и срок»). Реальные вызовы LLM.</div>
+  </div>
+</div>
+
+<script>
+const DESCS = {
+  window: "🪟 Держим только последние N сообщений, остальное отбрасываем. Дёшево (нет доп. вызовов), но ранний факт теряется навсегда.",
+  facts: "🗂 Старый текст выкидываем, но важные поля выписываем на карточку «ключ→значение» и шлём её всегда. Карточку обновляет отдельный вызов LLM.",
+  branch: "🌿 Закладка + независимые ветки от одной точки. Общий ствол хранится один раз, у каждой ветки своя дельта. Это про развилки, не про экономию.",
+};
+let MODE = "window";
+
+async function api(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})});
+  return r.json();
+}
+
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+
+function render(st){
+  document.getElementById("badge").textContent = st.model + " · окно " + st.window_size + " ток.";
+  document.getElementById("desc").textContent = DESCS[MODE];
+
+  // чат — полная активная история
+  const msgs = document.getElementById("msgs");
+  msgs.innerHTML = (st.history||[]).map(m =>
+    `<div class="m ${m.role}">${esc(m.content)}</div>`).join("");
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // панель веток
+  const bb = document.getElementById("branchbar");
+  if(MODE==="branch"){ bb.style.display="flex"; renderBranchBar(st); }
+  else bb.style.display="none";
+
+  renderHood(st);
+
+  const e = st.envelope||{};
+  document.getElementById("toks").innerHTML =
+    `вход в модель: <b>${e.input_tokens_real ?? "—"}</b> ток. (реально)` +
+    `&nbsp;·&nbsp;прикидка <b>${e.input_estimate ?? "—"}</b>` +
+    (MODE==="facts" ? `&nbsp;·&nbsp;обновлений карточки: <b>${st.facts_updates}</b>` : "");
+}
+
+function renderHood(st){
+  const e = st.envelope||{}, hood = document.getElementById("hood"), cut = document.getElementById("cut");
+  let html = `<div class="slot"><div class="lbl">роль (system)</div><div class="line role">${esc(e.role_prompt)}</div></div>`;
+
+  if(MODE==="facts"){
+    const card = (st.facts||"").trim();
+    html += `<div class="cardbox"><div class="lbl">🗂 карточка фактов (едет всегда)</div>`;
+    if(card){
+      html += `<div class="kv">` + card.split("\n").map(l=>{
+        const i=l.indexOf(":");
+        return i>0 ? `<div class="k">${esc(l.slice(0,i))}</div><div>${esc(l.slice(i+1).trim())}</div>`
+                   : `<div></div><div>${esc(l)}</div>`;
+      }).join("") + `</div>`;
+    } else html += `<div class="line muted" style="color:var(--muted)">пока пусто — появится после первой важной реплики</div>`;
+    html += `</div>`;
+  }
+
+  // окно / ветка — дословные реплики, что реально ушли
+  const body = e.window||[];
+  html += `<div class="slot"><div class="lbl">${MODE==="branch"?"🌿 ветка: ствол + дельта":"🪟 окно (последние N дословно)"}</div>` +
+    (body.length ? body.map(m=>`<div class="line r-${m.role}">${esc(m.role)}: ${esc(m.content)}</div>`).join("")
+                 : `<div class="line muted" style="color:var(--muted)">пусто</div>`) + `</div>`;
+
+  // для окна — показать, что отброшено
+  if(MODE==="window"){
+    const full = st.full_history||[], keep = st.keep_last;
+    const droppedN = Math.max(0, full.length - keep);
+    cut.textContent = droppedN ? `отброшено ${droppedN} сообщ.` : "";
+    if(droppedN){
+      html += `<div class="slot" style="opacity:.85"><div class="lbl">отброшено (модель НЕ видит)</div>` +
+        full.slice(0, droppedN).map(m=>`<div class="line dropped">${esc(m.role)}: ${esc(m.content)}</div>`).join("") + `</div>`;
+    }
+  } else cut.textContent = "";
+
+  hood.innerHTML = html;
+}
+
+function renderBranchBar(st){
+  const v = st.branches||{}, names = Object.keys(v.branches||{});
+  const bb = document.getElementById("branchbar");
+  let html = `<button class="ghost" onclick="bop('checkpoint')">📌 закладка</button>`;
+  html += `<button class="ghost" onclick="forkPrompt()">＋ ветка</button>`;
+  html += `<span style="color:var(--muted);font-size:12.5px">ствол: ${v.trunk_len||0} · активна:</span>`;
+  html += names.map(n=>`<span class="chip ${n===v.active?'on':''}" onclick="bop('switch','${n}')">${esc(n)} <small>(${v.branches[n]})</small></span>`).join("");
+  bb.innerHTML = html;
+}
+
+async function bop(op,name){ const st = await api("/api/branch",{op, name:name||""}); render(st); }
+function forkPrompt(){ const n = prompt("Имя новой ветки (от закладки):"); if(n) bop("fork", n); }
+
+async function setMode(m){
+  MODE = m;
+  document.querySelectorAll("#switch button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  const st = await api("/api/mode",{mode:m}); render(st);
+}
+
+async function send(){
+  const inp = document.getElementById("inp"), btn=document.getElementById("send");
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=""; btn.disabled=true; inp.disabled=true;
+  // оптимистично показать реплику
+  const msgs=document.getElementById("msgs");
+  msgs.innerHTML += `<div class="m user">${esc(text)}</div><div class="m assistant" style="opacity:.5">…</div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  const st = await api("/api/chat",{message:text});
+  render(st); btn.disabled=false; inp.disabled=false; inp.focus();
+}
+document.getElementById("inp").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
+
+async function clearAll(){ const st = await api("/api/clear",{}); render(st); }
+
+async function runCompare(){
+  const btn=document.getElementById("cmpbtn"), out=document.getElementById("cmpout");
+  btn.disabled=true; out.innerHTML="<span class='hint'>гоняю сценарий через обе стратегии (реальные вызовы, ~10–15 сек)…</span>";
+  const r = await api("/api/compare",{filler_turns:8});
+  const row = (label,h)=>`<tr>
+    <td><b>${label}</b></td>
+    <td class="${h.fact_recalled?'yes':'no'}">${h.fact_recalled?'✓ сохранён':'✗ потерян'}</td>
+    <td>${h.final_input_real ?? '—'} ток.</td>
+    <td>${h.extract_tokens_real} ток.</td>
+    <td style="max-width:340px">${esc((h.reply||'').slice(0,180))}</td></tr>`;
+  out.innerHTML = `<table>
+    <tr><th>стратегия</th><th>факт (500 000 / 14 марта)</th><th>вход финала</th><th>цена карточки</th><th>ответ</th></tr>
+    ${row("🪟 Окно", r.heroes.window)}
+    ${row("🗂 Facts", r.heroes.facts)}
+    </table>
+    <div class="hint">Окно дёшево (0 на карточку), но ранний факт выпал за окно и потерян. Facts держит факт ценой вызовов на карточку — окупается на длинном диалоге.</div>`;
+  btn.disabled=false;
+}
+
+document.querySelectorAll("#switch button").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.m)));
+fetch("/api/state").then(r=>r.json()).then(render);
+</script>
+</body>
+</html>
