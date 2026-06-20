@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Персонализация ассистента · День 12</title>
+<style>
+  :root{
+    --bg:#fbfbfa; --panel:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e7e7e4;
+    --accent:#1a6fd4; --drop:#b9b9b6; --good:#1c8a4b; --bad:#c0392b;
+    --short:#eef3f8; --shortline:#d4e2f0;
+    --work:#fff6ec; --workline:#f0dcc2;
+    --long:#f1f6ee; --longline:#d2e4cb;
+    --stated:#eef0fb; --statedline:#d4d9f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;}
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 22px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1{font-size:23px;font-weight:600;letter-spacing:-.02em;margin:0}
+  .sub{color:var(--muted);font-size:13.5px}
+  .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:#fff}
+
+  .ic{width:16px;height:16px;vertical-align:-3px;fill:none;stroke:currentColor;
+    stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px}
+  .panel h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:7px}
+
+  /* чат */
+  .chat{display:flex;flex-direction:column;height:560px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;user-select:none}
+  .toggle .dot{width:30px;height:18px;border-radius:999px;background:#d9d9d6;position:relative;transition:.15s}
+  .toggle .dot::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on{color:#2b6b3f;border-color:var(--longline)}
+  .toggle.on .dot{background:var(--good)}
+  .toggle.on .dot::after{left:14px}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .ghost .ic{width:14px;height:14px}
+
+  .msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:9px;padding-right:4px}
+  .m{max-width:84%;padding:8px 12px;border-radius:13px;font-size:14.5px;white-space:pre-wrap;word-wrap:break-word}
+  .m.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .m.assistant{align-self:flex-start;background:#f1f1ef;border-bottom-left-radius:4px}
+  .route{align-self:center;max-width:92%;font-size:12px;color:var(--muted);background:#faf9f6;
+    border:1px dashed var(--line);border-radius:9px;padding:6px 10px}
+  .route b{color:var(--ink);font-weight:600}
+  .route .tw{color:#a9682a}.route .tl{color:#2b6b3f}
+  .composer{display:flex;gap:8px;margin-top:12px}
+  .composer input{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14.5px;outline:none}
+  .composer input:focus{border-color:var(--accent)}
+  button.go{border:0;background:var(--accent);color:#fff;border-radius:10px;padding:0 16px;font-size:16px;font-weight:600;cursor:pointer}
+  button.go:disabled{opacity:.5;cursor:default}
+
+  .pref{display:flex;gap:8px;margin-bottom:12px}
+  .pref input{flex:1;border:1px solid var(--statedline);border-radius:10px;padding:8px 11px;font-size:13.5px;outline:none;background:#fcfcff}
+  .pref button{border:1px solid var(--statedline);background:#eef0fb;color:#3a44a0;border-radius:10px;padding:0 13px;font-size:13px;font-weight:600;cursor:pointer}
+
+  /* слои памяти */
+  .layers{display:flex;flex-direction:column;gap:12px}
+  .layer{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .layer .head{padding:10px 13px;display:flex;align-items:center;gap:8px;font-size:13px}
+  .layer .head .name{font-weight:600}
+  .layer .head .tag{margin-left:auto;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .layer .body{padding:11px 13px;border-top:1px solid var(--line);font-size:13.5px}
+  .layer.short .head{background:var(--short)} .layer.short{border-color:var(--shortline)}
+  .layer.work  .head{background:var(--work)}  .layer.work{border-color:var(--workline)}
+  .layer.long  .head{background:var(--long)}  .layer.long{border-color:var(--longline)}
+  .sub-card{padding:10px 13px}
+  .sub-card+.sub-card{border-top:1px dashed var(--line)}
+  .sub-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .sub-card .lbl .pill{font-size:10px;border-radius:999px;padding:1px 7px}
+  .pill.you{background:var(--stated);color:#3a44a0}
+  .pill.auto{background:var(--long);color:#2b6b3f}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+  .kv .k{color:var(--muted)}
+  .empty{color:var(--muted)}
+  .dlg .line{font-size:13px;white-space:pre-wrap;word-wrap:break-word;margin:2px 0}
+  .dlg .r-user{color:var(--accent)} .dlg .r-assistant{color:var(--ink)}
+  .dlg .dropped{color:var(--drop);text-decoration:line-through}
+  .toks{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .toks b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* сравнение профилей */
+  .cmp{margin-top:18px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+  .ans{border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+  .ans h3{margin:0 0 4px;font-size:13px;font-weight:600}
+  .ans .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .ans .card{font-size:12px;color:var(--muted);background:#faf9f6;border:1px solid var(--line);border-radius:8px;padding:6px 9px;margin-bottom:8px}
+  .ans.a{border-color:var(--statedline);background:#fcfcff}
+  .ans.b{border-color:var(--longline);background:#fbfdfa}
+  .ans .txt{font-size:13px;white-space:pre-wrap;word-wrap:break-word;max-height:300px;overflow:auto}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Персонализация ассистента</h1>
+      <div class="sub">День 12 — профиль пользователя поверх памяти: задаёшь сам + ассистент замечает; влияет на каждый ответ</div>
+    </div>
+    <span class="badge" id="badge">модель…</span>
+  </header>
+
+  <div class="grid">
+    <!-- слева: разговор -->
+    <div class="panel chat">
+      <h2>Разговор</h2>
+      <div class="pref">
+        <input id="prefinp" placeholder="Задать предпочтение явно: «пиши кратко, я юрист»…" autocomplete="off">
+        <button onclick="setPref()">задать</button>
+      </div>
+      <div class="controls">
+        <span class="toggle on" id="pf" onclick="togglePf()">
+          <span class="dot"></span> профиль в запросе</span>
+        <button class="ghost" onclick="newTask()" title="очистить рабочую и диалог, профиль оставить">
+          <svg class="ic" viewBox="0 0 20 20"><path d="M4 6h12M7 6V4h6v2M6 6l1 10h6l1-10"/></svg>новая задача</button>
+        <button class="ghost" onclick="clearAll()">
+          <svg class="ic" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>очистить всё</button>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <div class="composer">
+        <input id="inp" placeholder="Напишите сообщение…" autocomplete="off">
+        <button class="go" id="send" onclick="send()">→</button>
+      </div>
+    </div>
+
+    <!-- справа: слои памяти, профиль развёрнут на две части -->
+    <div class="panel">
+      <h2>Память — слои, и профиль из двух источников</h2>
+      <div class="layers">
+        <div class="layer short">
+          <div class="head">
+            <svg class="ic" viewBox="0 0 20 20"><path d="M10 5v5l3 2"/><circle cx="10" cy="10" r="7"/></svg>
+            <span class="name">Краткосрочная</span><span class="tag">текущий диалог</span></div>
+          <div class="body dlg" id="L-short"></div>
+        </div>
+        <div class="layer work">
+          <div class="head">
+            <svg class="ic" viewBox="0 0 20 20"><path d="M4 7h12v9H4zM7 7V5h6v2"/></svg>
+            <span class="name">Рабочая</span><span class="tag">данные задачи</span></div>
+          <div class="body" id="L-work"></div>
+        </div>
+        <div class="layer long">
+          <div class="head">
+            <svg class="ic" viewBox="0 0 20 20"><path d="M5 4h10v12l-5-3-5 3z"/></svg>
+            <span class="name">Профиль</span><span class="tag">переживает сессии · идёт в каждый запрос</span></div>
+          <div class="sub-card">
+            <div class="lbl"><span class="pill you">задано тобой</span> предпочтения, что ты прописал сам</div>
+            <div id="L-stated"></div>
+          </div>
+          <div class="sub-card">
+            <div class="lbl"><span class="pill auto">замечено автоматически</span> что ассистент выудил из диалога</div>
+            <div id="L-noticed"></div>
+          </div>
+        </div>
+      </div>
+      <div class="toks" id="toks"></div>
+    </div>
+  </div>
+
+  <!-- сравнение двух профилей -->
+  <div class="panel cmp">
+    <h2>Один вопрос — разные профили — разные ответы
+      <button class="ghost" style="margin-left:auto" id="cmpbtn" onclick="runTwo()">запустить</button></h2>
+    <div id="cmpout" class="hint">Один и тот же вопрос задаётся при двух разных профилях (юрист / разработчик). Перед каждым прогоном диалог чистится, чтобы на ответ влиял только профиль. Настоящие запросы к модели (~15–25 секунд).</div>
+  </div>
+</div>
+
+<script>
+let USE_PF = true;
+
+async function api(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})});
+  return r.json();
+}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+
+function card(fields, emptyMsg){
+  if(!fields || !fields.length) return `<div class="empty">${emptyMsg||"пусто"}</div>`;
+  return `<div class="kv">` + fields.map(([k,v])=>
+    k ? `<div class="k">${esc(k)}</div><div>${esc(v)}</div>`
+      : `<div></div><div>${esc(v)}</div>`).join("") + `</div>`;
+}
+
+function dialog(st){
+  const s = st.short, msgs = s.messages||[], drop = s.dropped||0;
+  if(!msgs.length) return `<div class="empty">диалог пуст</div>`;
+  return msgs.map((m,i)=>{
+    const out = drop && i < drop;
+    return `<div class="line r-${m.role} ${out?'dropped':''}">${esc(m.role)}: ${esc(m.content)}</div>`;
+  }).join("") + (drop ? `<div class="toks">за окном (последние ${s.keep_last}): забыто ${drop}</div>` : "");
+}
+
+function routeLine(t){
+  if(!t) return "";
+  if(t.saved_nothing) return `<div class="route">ассистент <b>ничего не заметил</b> — проходная реплика</div>`;
+  let bits = [];
+  if(t.to_working && t.to_working.length) bits.push(`<span class="tw">в рабочую</span>: ${esc(t.to_working.join("; "))}`);
+  if(t.to_noticed && t.to_noticed.length) bits.push(`<span class="tl">в профиль (заметил сам)</span>: ${esc(t.to_noticed.join("; "))}`);
+  return `<div class="route">${bits.join(" &nbsp;|&nbsp; ")}</div>`;
+}
+
+function render(st, route){
+  document.getElementById("badge").textContent =
+    st.model + " · окно " + st.keep_last + " реплик";
+  document.getElementById("L-short").innerHTML = dialog(st);
+  document.getElementById("L-work").innerHTML  = card(st.working.fields, "пока пусто — нет данных задачи");
+  document.getElementById("L-stated").innerHTML  = card(st.profile.stated.fields, "пусто — задай через поле выше");
+  document.getElementById("L-noticed").innerHTML = card(st.profile.noticed.fields, "пока ничего не замечено");
+
+  const msgs = document.getElementById("msgs");
+  const dlg = (st.short.messages||[]).map(m=>`<div class="m ${m.role}">${esc(m.content)}</div>`).join("");
+  msgs.innerHTML = dlg + (route ? routeLine(route) : "");
+  msgs.scrollTop = msgs.scrollHeight;
+
+  document.getElementById("toks").innerHTML =
+    `последний запрос в модель: <b>${st.input_tokens ?? "—"}</b> токенов&nbsp;&nbsp;·&nbsp;&nbsp;`+
+    `служебные вызовы (роутер+нормализатор): <b>${st.router_tokens||0}</b> токенов`;
+}
+
+function togglePf(){
+  USE_PF = !USE_PF;
+  document.getElementById("pf").classList.toggle("on", USE_PF);
+}
+
+async function setPref(){
+  const inp=document.getElementById("prefinp");
+  const t=inp.value.trim(); if(!t) return;
+  inp.value=""; inp.disabled=true;
+  const st = await api("/api/preference",{preference:t});
+  render(st, st.last_route);
+  inp.disabled=false; inp.focus();
+}
+document.getElementById("prefinp").addEventListener("keydown",e=>{if(e.key==="Enter")setPref();});
+
+async function send(){
+  const inp = document.getElementById("inp"), btn=document.getElementById("send");
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=""; btn.disabled=true; inp.disabled=true;
+  const msgs=document.getElementById("msgs");
+  msgs.innerHTML += `<div class="m user">${esc(text)}</div><div class="m assistant" style="opacity:.5">…</div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  const st = await api("/api/chat",{message:text, use_profile:USE_PF});
+  render(st, st.last_route);
+  btn.disabled=false; inp.disabled=false; inp.focus();
+}
+document.getElementById("inp").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
+
+async function newTask(){ const st = await api("/api/new_task",{}); render(st, null); }
+async function clearAll(){ const st = await api("/api/clear",{}); render(st, null); }
+
+async function runTwo(){
+  const btn=document.getElementById("cmpbtn"), out=document.getElementById("cmpout");
+  btn.disabled=true;
+  out.innerHTML="<span class='hint'>задаю один вопрос при двух профилях (настоящие запросы, ~15–25 секунд)…</span>";
+  const r = await api("/api/two_profiles",{});
+  const a=r.profile_a, b=r.profile_b;
+  out.innerHTML = `
+    <div class="hint">Вопрос: «${esc(r.question)}»</div>
+    <div class="two">
+      <div class="ans a"><h3>Профиль: ${esc(a.name)}</h3>
+        <div class="card">${esc(a.card.replace(/\n/g," · "))}</div>
+        <div class="meta">${a.len} символов · код: ${a.has_code?"да":"нет"}</div>
+        <div class="txt">${esc(a.answer)}</div></div>
+      <div class="ans b"><h3>Профиль: ${esc(b.name)}</h3>
+        <div class="card">${esc(b.card.replace(/\n/g," · "))}</div>
+        <div class="meta">${b.len} символов · код: ${b.has_code?"да":"нет"}</div>
+        <div class="txt">${esc(b.answer)}</div></div>
+    </div>
+    <div class="hint">Один вопрос, два ответа: юристу — простыми словами без кода, разработчику — кратко с примером на Python. Различие задаёт только профиль, подмешанный в каждый запрос. После прогона профиль и диалог очищены.</div>`;
+  // профиль/диалог почистились в демо — обновим панель состояния
+  const st = await fetch("/api/state").then(x=>x.json()).catch(()=>null);
+  if(st) render(st, null);
+  btn.disabled=false;
+}
+
+fetch("/api/state").then(r=>r.json()).then(st=>render(st, st.last_route));
+</script>
+</body>
+</html>
