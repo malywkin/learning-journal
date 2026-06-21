@@ -1,93 +1,105 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>День 14 — Инварианты агента</title>
+<title>Инварианты агента · День 14</title>
 <style>
   :root{
-    --bg:#fbfbfd; --card:#fff; --ink:#1d1d1f; --muted:#6e6e73; --line:#e3e3e6;
-    --accent:#0071e3; --bad:#d6312b; --good:#1d8a3f; --soft:#9554d6; --hard:#0a6b53;
+    --bg:#0f1117; --card:#171a22; --card2:#1d212b; --line:#2a2f3a;
+    --ink:#e8eaed; --muted:#9aa1ad; --faint:#6b7280;
+    --accent:#5b9dff; --good:#3ecf8e; --warn:#f0b549; --bad:#f0726a; --sys:#b08cff;
     --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
-  h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px}
-  .sub{color:var(--muted);font-size:15px;margin:0 0 28px}
-  h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
-    color:var(--muted);margin:0 0 12px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  @media(max-width:880px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:20px;margin-bottom:20px}
-  .inv{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 80px}
+  header h1{font-size:21px;font-weight:650;letter-spacing:-.02em;margin:0}
+  header .sub{color:var(--muted);font-size:13px;margin-top:3px}
+
+  /* вкладки */
+  .tabs{display:flex;gap:4px;margin:22px 0 16px;border-bottom:1px solid var(--line)}
+  .tab-btn{background:none;border:none;color:var(--muted);font:inherit;font-size:14px;
+    padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+  .tab{display:none} .tab.on{display:block}
+  .lead{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+  .panel h3{margin:0 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+
+  input[type=text],textarea{width:100%;background:var(--card2);border:1px solid var(--line);
+    color:var(--ink);border-radius:10px;padding:11px 13px;font:inherit;font-size:14px;outline:none;resize:vertical}
+  input:focus,textarea:focus{border-color:var(--accent)}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--ink);padding:10px 15px;font-size:14px;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.go{background:var(--accent);border-color:var(--accent);color:#08111f;font-weight:650}
+  button:disabled{opacity:.4;cursor:default}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+
+  /* сегмент-переключатель */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg .lbl{padding:7px 12px;font-size:12px;color:var(--faint);background:var(--card2);border-right:1px solid var(--line)}
+  .seg button{border:none;border-radius:0;background:var(--card);padding:7px 13px;font-size:13px;color:var(--muted)}
+  .seg button.on{background:var(--accent);color:#08111f;font-weight:600}
+
+  /* правила: два этажа */
+  .inv{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
   .inv:last-child{border-bottom:none}
-  .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap;margin-top:2px}
-  .tag.sys{background:#e7f4ef;color:var(--hard)}
-  .tag.usr{background:#f1e9fa;color:var(--soft)}
-  .inv .body{flex:1}
-  .inv .rule{font-size:14px}
-  .inv .kw{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
-  .inv button{border:none;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
-  .inv button:hover{color:var(--bad)}
-  .lock{font-size:13px;color:var(--muted);margin-top:2px}
-  textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;
-    padding:10px 12px;font:inherit;font-size:14px;resize:vertical}
-  textarea:focus,input:focus{outline:none;border-color:var(--accent)}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg button{border:none;background:#fff;padding:6px 12px;font-size:13px;cursor:pointer;color:var(--ink)}
-  .seg button.on{background:var(--accent);color:#fff}
-  .seg .lbl{padding:6px 10px;font-size:12px;color:var(--muted);background:#f5f5f7;border-right:1px solid var(--line)}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;
-    padding:10px 18px;font-size:14px;font-weight:500;cursor:pointer}
-  .btn:disabled{opacity:.5;cursor:default}
-  .btn.ghost{background:#f5f5f7;color:var(--ink)}
-  .attempt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:13px}
-  .det{font-family:var(--mono);font-size:12px}
-  .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px}
-  .pill.ok{background:#e7f4ef;color:var(--good)}
-  .pill.no{background:#fbe9e8;color:var(--bad)}
-  .final{border-radius:10px;padding:12px 14px;margin-top:10px;font-size:14px;white-space:pre-wrap}
-  .final.ok{background:#f0f8f3;border:1px solid #cdebd9}
-  .final.blocked{background:#fdf0ef;border:1px solid #f3d2d0}
-  .muted{color:var(--muted);font-size:13px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
-  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
-  code{font-family:var(--mono);font-size:12px;background:#f5f5f7;padding:1px 5px;border-radius:5px}
-  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;margin-top:1px}
+  .badge.sys{background:#241c34;color:var(--sys)} .badge.usr{background:#13203a;color:var(--accent)}
+  .inv .body{flex:1}.inv .rule{font-size:14px}
+  .inv .kw{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:3px}
+  .inv .x{border:none;background:none;color:var(--faint);font-size:19px;cursor:pointer;padding:0 4px}
+  .inv .x:hover{color:var(--bad)}
+  .inv .lock{color:var(--faint);font-size:12px;margin-top:3px}
+
+  /* трасса стража */
+  .think{display:none;align-items:center;gap:10px;color:var(--accent);
+    background:#13203a;border:1px solid #284574;border-radius:12px;padding:12px 15px;font-size:14px;margin-top:14px}
+  .think.show{display:flex}
+  .spin{width:15px;height:15px;border:2px solid #2b3f63;border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .attempt{border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:11px 14px;margin-top:10px}
+  .attempt .hd{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:7px}
+  .attempt .hd b{font-weight:650}
+  .det{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px}
+  .det .y{color:var(--bad)} .det .n{color:var(--good)}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .pill.no{background:#34191a;color:var(--bad)} .pill.ok{background:#13261d;color:var(--good)}
+  .final{border-radius:12px;padding:13px 15px;margin-top:12px;font-size:14px;white-space:pre-wrap}
+  .final.ok{background:#13261d;border:1px solid #2c5b46}
+  .final.no{background:#241317;border:1px solid #5b2c33}
+  .final .st{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  td,th{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600}
+  code{font-family:var(--mono);font-size:12px;background:var(--card2);padding:2px 6px;border-radius:6px;color:var(--muted)}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:10px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Инварианты агента</h1>
-  <p class="sub">Правила, которые ассистент не нарушит, даже если его уговаривать. Живут в коде,
-    а не в промпте — и проверяются двумя детекторами.</p>
+  <header>
+    <h1>Инварианты агента</h1>
+    <div class="sub">День 14 · правила, которые ассистент не нарушит — держит код, а не промпт · продолжение Дня 13</div>
+  </header>
 
-  <div class="grid">
-    <!-- ЛЕВО: два этажа правил -->
-    <div class="card">
-      <h2>Два этажа правил · хранятся отдельно от диалога</h2>
-      <div id="invlist"></div>
-      <div class="row" style="margin-top:14px">
-        <input type="text" id="newrule" placeholder="Новый самозапрет, напр.: не предлагать решения на PHP">
-      </div>
-      <div class="row">
-        <input type="text" id="newkw" placeholder="маркеры через запятую (необязательно): php, &lt;?php">
-        <button class="btn ghost" onclick="addRule()">Добавить самозапрет</button>
-      </div>
-      <p class="hint">Системные правила — read-only: пользователь их не снимет. Самозапрет ставит
-        и снимает сам пользователь («задачка со звёздочкой»).</p>
-    </div>
+  <div class="tabs">
+    <button class="tab-btn on" data-tab="chat">Диалог</button>
+    <button class="tab-btn" data-tab="rules">Правила</button>
+    <button class="tab-btn" data-tab="detect">Детекторы</button>
+  </div>
 
-    <!-- ПРАВО: чат со стражем -->
-    <div class="card">
-      <h2>Спросить ассистента · страж проверит ответ</h2>
-      <textarea id="msg" rows="2" placeholder="Напр.: дай минимальный пример класса с методом main на Java"></textarea>
+  <!-- ВКЛАДКА 1 · ДИАЛОГ (главная сцена: страж в работе) -->
+  <section class="tab on" id="tab-chat">
+    <p class="lead">Спроси ассистента. Ответ модели проходит через страж — он проверяет его выбранным
+      детектором и либо пропускает, либо переписывает / отказывает.</p>
+    <div class="panel">
       <div class="row">
         <div class="seg"><span class="lbl">детектор</span>
           <button data-g="det" data-v="deterministic" onclick="pick('det',this)">по букве</button>
@@ -105,132 +117,149 @@
           <button data-g="soft" data-v="0" onclick="pick('soft',this)">выкл</button>
         </div>
       </div>
-      <button class="btn" id="askbtn" onclick="ask()">Спросить</button>
-      <p class="hint">«Правило в промпте выкл» — модель не предупреждена и свободно нарушает;
-        тогда видно, как ловит именно страж в коде.</p>
-      <div id="trace"></div>
+      <div class="row">
+        <input type="text" id="msg" placeholder="Напр.: дай минимальный пример класса с методом main на Java"
+          onkeydown="if(event.key==='Enter')ask()">
+        <button class="go" id="askbtn" onclick="ask()">Спросить</button>
+      </div>
+      <p class="hint">«Правило в промпте: выкл» — модель не предупреждена и свободно нарушает;
+        тогда видно, что границу держит именно страж в коде, а не послушание модели.</p>
     </div>
-  </div>
+    <div class="think" id="think"><span class="spin"></span><span>модель отвечает, страж проверяет…</span></div>
+    <div id="trace"></div>
+  </section>
 
-  <!-- НИЗ: песочница + обход -->
-  <div class="grid">
-    <div class="card">
-      <h2>Проверить готовый текст · что поймает каждый детектор</h2>
-      <textarea id="probe" rows="3" placeholder="Вставь любой текст — напр. код на Java или фразу с матом"></textarea>
-      <div class="row"><button class="btn ghost" onclick="probe()">Прогнать через страж</button></div>
+  <!-- ВКЛАДКА 2 · ПРАВИЛА (два этажа, хранятся отдельно от диалога) -->
+  <section class="tab" id="tab-rules">
+    <p class="lead">Два этажа правил, оба живут отдельно от переписки. Системные — read-only, пользователь
+      их не снимет. Самозапреты ставит и снимает сам пользователь («задачка со звёздочкой»).</p>
+    <div class="panel">
+      <h3>Действующие инварианты</h3>
+      <div id="invlist"></div>
+    </div>
+    <div class="panel">
+      <h3>Добавить самозапрет</h3>
+      <div class="row"><input type="text" id="newrule" placeholder="Правило, напр.: не предлагать решения на PHP"></div>
+      <div class="row">
+        <input type="text" id="newkw" placeholder="маркеры через запятую (необязательно): php, &lt;?php">
+        <button onclick="addRule()">Добавить</button>
+      </div>
+      <p class="hint">Маркеры — подстроки для детектора-по-букве. Если оставить пусто, возьму слова из правила.</p>
+    </div>
+  </section>
+
+  <!-- ВКЛАДКА 3 · ДЕТЕКТОРЫ (сравнение двух способов проверки) -->
+  <section class="tab" id="tab-detect">
+    <p class="lead">Два способа поймать нарушение — преподаватель советовал проверить оба. По букве дёшево,
+      но слепо к смыслу; по смыслу умнее, но дороже и непостоянно.</p>
+    <div class="panel">
+      <h3>Песочница · прогнать готовый текст через оба детектора</h3>
+      <div class="row"><textarea id="probe" rows="3" placeholder="Вставь текст — напр. код на Java или фразу с матом"></textarea></div>
+      <div class="row"><button onclick="probe()">Проверить стражем</button></div>
       <div id="probeout"></div>
     </div>
-
-    <div class="card">
-      <h2>Обход детектора-по-букве · своими руками</h2>
-      <p class="muted">Блок-лист ищет подстроки <code>java</code>, <code>public class</code>,
+    <div class="panel">
+      <h3>Обход детектора-по-букве</h3>
+      <p class="hint" style="margin-top:0">Блок-лист ищет подстроки <code>java</code>, <code>public class</code>,
         <code>system.out</code>. Смотри, что проходит мимо:</p>
       <table id="bypass"><thead><tr><th>Способ</th><th>Текст</th><th>По букве</th></tr></thead><tbody></tbody></table>
-      <p class="hint">Перефраз и base64 проскакивают блок-лист. По смыслу их ловит судья —
-        поэтому в проде ставят оба слоя (defense in depth).</p>
+      <p class="hint">Перефраз и base64 проскакивают блок-лист. По смыслу их ловит судья — поэтому в проде
+        ставят оба слоя (defense in depth).</p>
     </div>
-  </div>
+  </section>
 </div>
 
 <script>
-const opt = {det:"both", mode:"rewrite", soft:"1"};
-function pick(g, el){
-  opt[g] = el.dataset.v;
-  el.parentNode.querySelectorAll("button").forEach(b=>b.classList.remove("on"));
-  el.classList.add("on");
-}
+const $=id=>document.getElementById(id);
+const opt={det:"both",mode:"rewrite",soft:"1"};
+function pick(g,el){opt[g]=el.dataset.v;
+  el.parentNode.querySelectorAll("button").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
 
+// вкладки
+document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); $("tab-"+b.dataset.tab).classList.add("on");
+});
+
+// ── правила ────────────────────────────────────────────────────────────
 async function loadInvariants(){
-  const r = await fetch("/api/invariants"); const d = await r.json();
-  const box = document.getElementById("invlist"); box.innerHTML = "";
-  d.system.forEach(i=>box.appendChild(invRow(i, false)));
-  d.user.forEach(i=>box.appendChild(invRow(i, true)));
+  const d=await (await fetch("/api/invariants")).json();
+  const box=$("invlist"); box.innerHTML="";
+  d.system.forEach(i=>box.appendChild(invRow(i,false)));
+  d.user.forEach(i=>box.appendChild(invRow(i,true)));
 }
-function invRow(i, removable){
-  const el = document.createElement("div"); el.className = "inv";
-  const tag = i.layer==="system" ? '<span class="tag sys">система</span>'
-                                 : '<span class="tag usr">самозапрет</span>';
-  const rm = removable ? `<button title="снять" onclick="rm('${i.id}')">×</button>`
-                       : `<span class="lock" title="read-only">замок</span>`;
-  el.innerHTML = `${tag}<div class="body"><div class="rule">${esc(i.rule)}</div>`+
-    `<div class="kw">маркеры: ${i.keywords.join(", ")||"—"}</div></div>${rm}`;
+function invRow(i,removable){
+  const el=document.createElement("div"); el.className="inv";
+  const badge=i.layer==="system"?'<span class="badge sys">система</span>':'<span class="badge usr">самозапрет</span>';
+  const tail=removable?`<button class="x" title="снять" onclick="rm('${i.id}')">×</button>`
+                      :`<span class="lock" title="read-only">замок</span>`;
+  el.innerHTML=`${badge}<div class="body"><div class="rule">${esc(i.rule)}</div>`+
+    `<div class="kw">маркеры: ${esc(i.keywords.join(", ")||"—")}</div></div>${tail}`;
   return el;
 }
 async function addRule(){
-  const rule = document.getElementById("newrule").value.trim(); if(!rule) return;
-  const kw = document.getElementById("newkw").value.trim();
+  const rule=$("newrule").value.trim(); if(!rule)return;
   await fetch("/api/add",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({rule, keywords:kw})});
-  document.getElementById("newrule").value=""; document.getElementById("newkw").value="";
-  loadInvariants();
+    body:JSON.stringify({rule,keywords:$("newkw").value.trim()})});
+  $("newrule").value="";$("newkw").value=""; loadInvariants();
 }
 async function rm(id){
-  await fetch("/api/remove",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id})});
+  await fetch("/api/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
   loadInvariants();
 }
 
-async function ask(){
-  const message = document.getElementById("msg").value.trim(); if(!message) return;
-  const btn = document.getElementById("askbtn"); btn.disabled=true; btn.textContent="Думаю…";
-  const r = await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({message, detector:opt.det, mode:opt.mode, soft:opt.soft==="1"})});
-  const t = await r.json();
-  renderTrace(t);
-  btn.disabled=false; btn.textContent="Спросить";
-}
-function renderTrace(t){
-  const box = document.getElementById("trace"); box.innerHTML="";
-  t.attempts.forEach((a,n)=>{
-    const g=a.guard;
-    box.appendChild(attemptEl(n+1, a.hardened, g));
-  });
-  const ok = (t.status==="ok"||t.status==="fixed");
-  const f = document.createElement("div");
-  f.className = "final "+(ok?"ok":"blocked");
-  f.textContent = statusLabel(t.status)+"\n\n"+t.final;
-  box.appendChild(f);
-}
-function attemptEl(n, hardened, g){
+// ── общий рендер карточки попытки/проверки ─────────────────────────────
+function attemptCard(g,title){
   const el=document.createElement("div"); el.className="attempt";
-  const det = g.deterministic.length
-    ? g.deterministic.map(h=>`${h.id}←${h.matched.join("/")}`).join(", ")
-    : "молчит";
-  let judge="не запускался";
-  if(g.judge!==null) judge = g.judge.violated ? "НАРУШЕНО ("+g.judge.ids.join(",")+")" : "чисто";
-  const verdict = g.blocked ? '<span class="pill no">страж блокирует</span>'
-                            : '<span class="pill ok">страж пропускает</span>';
-  el.innerHTML = `<b>попытка ${n}</b>${hardened?' · после усиления':''} ${verdict}`+
-    `<div class="det">по букве: ${esc(det)}</div>`+
-    `<div class="det">по смыслу: ${esc(judge)}</div>`;
+  const det=g.deterministic.length
+    ? '<span class="y">поймал: '+g.deterministic.map(h=>esc(h.id+"←"+h.matched.join("/"))).join(", ")+'</span>'
+    : '<span class="n">молчит</span>';
+  let judge='не запускался';
+  if(g.judge!==null) judge = g.judge.violated
+    ? '<span class="y">НАРУШЕНО ('+esc(g.judge.ids.join(","))+')</span>' : '<span class="n">чисто</span>';
+  const verdict=g.blocked?'<span class="pill no">страж блокирует</span>':'<span class="pill ok">страж пропускает</span>';
+  el.innerHTML=`<div class="hd"><b>${esc(title)}</b> ${verdict}</div>`+
+    `<div class="det">по букве: ${det}</div><div class="det">по смыслу: ${judge}</div>`;
   return el;
 }
-function statusLabel(s){
-  return {ok:"Ответ чистый с первого раза",fixed:"Переписано стражем до чистого",
-    refused:"Отказ — нарушает правило",refused_after_retries:"Отказ после попыток переписать"}[s]||s;
-}
 
+// ── диалог ─────────────────────────────────────────────────────────────
+async function ask(){
+  const message=$("msg").value.trim(); if(!message)return;
+  const btn=$("askbtn"); btn.disabled=true; $("think").classList.add("show"); $("trace").innerHTML="";
+  const t=await (await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({message,detector:opt.det,mode:opt.mode,soft:opt.soft==="1"})})).json();
+  $("think").classList.remove("show"); btn.disabled=false;
+  const box=$("trace"); box.innerHTML="";
+  t.attempts.forEach((a,n)=>box.appendChild(attemptCard(a.guard,
+    "попытка "+(n+1)+(a.hardened?" · после усиления":""))));
+  const ok=(t.status==="ok"||t.status==="fixed");
+  const f=document.createElement("div"); f.className="final "+(ok?"ok":"no");
+  f.innerHTML=`<span class="st">${esc(statusLabel(t.status))}</span>${esc(t.final)}`;
+  box.appendChild(f);
+}
+function statusLabel(s){return {ok:"Ответ чистый с первого раза",fixed:"Переписано стражем до чистого",
+  refused:"Отказ — нарушает правило",refused_after_retries:"Отказ после попыток переписать"}[s]||s;}
+
+// ── детекторы ──────────────────────────────────────────────────────────
 async function probe(){
-  const text=document.getElementById("probe").value; if(!text.trim()) return;
-  const r=await fetch("/api/probe",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({text, detector:"both"})});
-  const g=await r.json();
-  document.getElementById("probeout").innerHTML="";
-  document.getElementById("probeout").appendChild(attemptEl(1,false,g));
+  const text=$("probe").value; if(!text.trim())return;
+  const g=await (await fetch("/api/probe",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text,detector:"both"})})).json();
+  $("probeout").innerHTML=""; $("probeout").appendChild(attemptCard(g,"результат проверки"));
 }
-
 async function loadBypass(){
-  const r=await fetch("/api/bypass"); const d=await r.json();
+  const d=await (await fetch("/api/bypass")).json();
   const tb=document.querySelector("#bypass tbody"); tb.innerHTML="";
   d.samples.forEach(s=>{
     const tr=document.createElement("tr");
-    const cell = s.caught ? '<span class="pill no">поймал</span>'
-                          : '<span class="pill ok">прошёл мимо</span>';
-    tr.innerHTML=`<td>${esc(s.name)}</td><td><code>${esc(s.text.slice(0,42))}…</code></td><td>${cell}</td>`;
+    const cell=s.caught?'<span class="pill no">поймал</span>':'<span class="pill ok">прошёл мимо</span>';
+    tr.innerHTML=`<td>${esc(s.name)}</td><td><code>${esc(s.text.slice(0,40))}…</code></td><td>${cell}</td>`;
     tb.appendChild(tr);
   });
 }
-function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
 
 loadInvariants(); loadBypass();
 </script>
