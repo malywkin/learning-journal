@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как работает состояние задачи · День 13</title>
+<style>
+  :root{
+    --bg:#0c0e14; --bg2:#0f1320; --ink:#eef1f6; --muted:#9aa3b2; --faint:#5b6473;
+    --line:#262c3a; --accent:#5b9dff;
+    --research:#5b9dff; --drafting:#f5b14b; --validation:#b98cff; --done:#3ecf8e; --human:#3ecf8e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(1200px 600px at 50% -10%, #141a2b 0%, var(--bg) 60%);
+    color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+    display:flex;flex-direction:column;min-height:100%}
+  .top{padding:20px 24px 6px;text-align:center}
+  .top h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.02em}
+  .top .sub{color:var(--muted);font-size:13px;margin-top:3px}
+
+  .stage{position:relative;flex:1;max-width:960px;width:100%;margin:0 auto;padding:10px 20px}
+  /* три горизонтальные полосы */
+  .orch-row{display:flex;justify-content:center;margin-top:8px}
+  .nodes-row{display:flex;justify-content:space-between;gap:14px;margin:62px 6px 0;position:relative}
+  .human-row{display:flex;justify-content:center;margin-top:64px}
+
+  .orch{border:1px solid var(--line);background:linear-gradient(180deg,#161c2c,#11151f);
+    border-radius:14px;padding:12px 22px;text-align:center;position:relative;transition:.4s;min-width:320px}
+  .orch .t{font-weight:650;letter-spacing:.02em}
+  .orch .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .orch.on{box-shadow:0 0 0 1px var(--accent), 0 0 34px -6px var(--accent);border-color:var(--accent)}
+
+  /* шина и коннекторы оркестратор -> узлы */
+  .bus{position:absolute;left:8%;right:8%;top:-34px;height:2px;background:var(--line)}
+  .drop{position:absolute;top:-34px;width:2px;height:34px;background:var(--line);overflow:hidden}
+  .drop::after{content:"";position:absolute;left:-1px;top:-40%;width:4px;height:40%;
+    background:linear-gradient(180deg,transparent,var(--accent),transparent);opacity:0}
+  .drop.flow::after{animation:drop 0.9s linear infinite;opacity:1}
+  @keyframes drop{from{top:-40%}to{top:100%}}
+
+  .node{flex:1;border:1px solid var(--line);background:var(--bg2);border-radius:14px;
+    padding:13px 12px;text-align:center;position:relative;transition:.35s;opacity:.55}
+  .node .role{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+  .node .nm{font-weight:650;font-size:15px;margin-top:2px}
+  .node .ag{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .node .art{margin-top:9px;font-size:11.5px;color:#0a1019;background:var(--c);border-radius:8px;
+    padding:3px 8px;display:inline-block;font-weight:600;opacity:0;transform:translateY(6px);transition:.4s}
+  .node.on{opacity:1;border-color:var(--c);box-shadow:0 0 0 1px var(--c), 0 12px 30px -14px var(--c);transform:translateY(-3px)}
+  .node.done{opacity:.92}
+  .node.done .nm::after{content:" ✓";color:var(--done)}
+  .node.show-art .art{opacity:1;transform:none}
+  /* «думает» */
+  .dots{height:12px;margin-top:7px;display:flex;gap:4px;justify-content:center;opacity:0;transition:.2s}
+  .node.think .dots{opacity:1}
+  .dots i{width:6px;height:6px;border-radius:50%;background:var(--c);animation:blink 1s infinite}
+  .dots i:nth-child(2){animation-delay:.2s} .dots i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+  /* связь узел -> человек */
+  .link-h{position:absolute;width:2px;background:var(--line);left:50%;transform:translateX(-50%);
+    bottom:-58px;height:58px;overflow:hidden;opacity:0;transition:.3s}
+  .link-h.show{opacity:1}
+  .link-h::after{content:"";position:absolute;left:-1px;width:4px;height:40%;
+    background:linear-gradient(180deg,transparent,var(--human),transparent);top:-40%}
+  .link-h.flow::after{animation:drop .8s linear infinite}
+
+  .human{border:1px solid #2c5b46;background:#10211a;border-radius:14px;padding:11px 18px;
+    text-align:center;position:relative;transition:.35s;opacity:.5;min-width:280px}
+  .human.on{opacity:1;box-shadow:0 0 0 1px var(--human),0 0 30px -8px var(--human)}
+  .human .t{font-weight:650;color:#bff3da}
+  .human .ask{font-size:12.5px;color:var(--muted);margin-top:3px;min-height:16px}
+  .human .verdict{margin-top:7px;font-size:12px;font-weight:600;opacity:0;transition:.3s}
+  .human.choose .verdict{opacity:1}
+
+  /* задача и документ по краям */
+  .chip{position:absolute;top:96px;padding:9px 13px;border-radius:10px;font-size:12.5px;font-weight:600;
+    border:1px solid var(--line);background:#11151f;transition:.6s;opacity:0}
+  #task{left:18px;transform:translateX(-12px)} #task.in{opacity:1;transform:none}
+  #doc{right:18px;color:#0a1019;background:var(--done);border-color:var(--done);transform:translateX(12px)}
+  #doc.in{opacity:1;transform:none}
+
+  /* нижняя панель: подпись шага + контролы */
+  .cap{max-width:880px;margin:8px auto 4px;padding:0 24px;text-align:center;min-height:48px}
+  .cap .big{font-size:16px;font-weight:600}
+  .cap .small{font-size:13px;color:var(--muted);margin-top:3px}
+  .bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:6px 0 22px}
+  .bar button{font:inherit;color:var(--ink);background:#171c28;border:1px solid var(--line);
+    border-radius:10px;padding:9px 14px;cursor:pointer;transition:.15s}
+  .bar button:hover{border-color:var(--accent)}
+  .bar .pp{background:var(--accent);border-color:var(--accent);color:#08111f;font-weight:650;min-width:128px}
+  .pips{display:flex;gap:6px;margin:0 8px}
+  .pip{width:8px;height:8px;border-radius:50%;background:#2a3142;transition:.2s}
+  .pip.on{background:var(--accent);transform:scale(1.25)}
+  /* финальная плашка resume */
+  .resume{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(10,12,18,.0);opacity:0;pointer-events:none;transition:.5s}
+  .resume.show{opacity:1;background:rgba(10,12,18,.55)}
+  .resume .card{background:#11151f;border:1px solid var(--line);border-radius:16px;padding:22px 26px;max-width:520px;text-align:center}
+  .resume .card .ic{font-size:30px} .resume .card .h{font-weight:650;font-size:17px;margin:6px 0 6px}
+  .resume .card .x{color:var(--muted);font-size:13.5px}
+
+  /* блок «теория» — оверлей с пунктами, появляются по очереди */
+  .theory{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(9,11,17,.72);opacity:0;pointer-events:none;transition:.45s;padding:12px}
+  .theory.show{opacity:1}
+  .theory .tc{background:linear-gradient(180deg,#141a28,#0f1320);border:1px solid var(--line);
+    border-radius:16px;padding:20px 24px;max-width:620px;width:100%}
+  .theory .badge{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:#08111f;background:var(--accent);border-radius:999px;padding:3px 10px;font-weight:700}
+  .theory h3{margin:10px 0 14px;font-size:18px;font-weight:650}
+  .theory ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .theory li{display:flex;gap:10px;align-items:flex-start;font-size:14px;
+    opacity:0;transform:translateY(8px)}
+  .theory.show li{animation:rise .5s forwards}
+  .theory.show li:nth-child(1){animation-delay:.15s}
+  .theory.show li:nth-child(2){animation-delay:.5s}
+  .theory.show li:nth-child(3){animation-delay:.85s}
+  .theory.show li:nth-child(4){animation-delay:1.2s}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .theory li .mk{flex:0 0 22px;height:22px;border-radius:7px;display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:#08111f;background:var(--accent)}
+  .theory li .mk.g{background:var(--done)} .theory li .mk.o{background:var(--drafting,#f5b14b)}
+  .theory li .mk.p{background:var(--validation)}
+  .theory li b{color:var(--ink)} .theory li span{color:var(--muted)}
+
+  /* ── сцена-анимация «кто переключает стрелку» ── */
+  .scene2{position:absolute;inset:0;background:rgba(9,11,17,.82);opacity:0;pointer-events:none;
+    transition:.4s;display:flex;flex-direction:column;justify-content:center;gap:30px;padding:30px 40px}
+  .scene2.show{opacity:1}
+  .lane{position:relative;height:96px}
+  .lane .cap2{position:absolute;top:-6px;left:0;font-size:13px}
+  .lane .cap2 b{color:var(--ink)} .lane .cap2 span{color:var(--muted)}
+  .rail{position:absolute;left:0;right:0;top:58px;height:4px;border-radius:3px;
+    background:repeating-linear-gradient(90deg,#2c3344 0 14px,#222838 14px 22px)}
+  .station{position:absolute;top:42px;width:96px;height:34px;border-radius:9px;border:1px solid var(--line);
+    background:#11151f;display:grid;place-items:center;font-size:12px;color:var(--muted);transform:translateX(-50%)}
+  .station.s-start{left:7%} .station.s-end{left:90%}
+  .station.s-end{color:#0a1019;background:var(--done);border-color:var(--done);font-weight:600}
+  /* развилка-стрелка по центру */
+  .switch{position:absolute;left:48%;top:30px;width:58px;height:58px;border-radius:50%;
+    display:grid;place-items:center;transform:translateX(-50%);font-size:24px;border:1px solid var(--line);background:#0f1320}
+  .lane.rule .switch{color:var(--accent)}
+  .scene2.show .lane.rule .switch{animation:spin 2.2s linear infinite}
+  @keyframes spin{to{transform:translateX(-50%) rotate(360deg)}}
+  .lane.ai .switch{color:var(--validation);border-color:var(--validation)}
+  .scene2.show .lane.ai .switch{animation:pulseSw 1.2s ease-in-out infinite}
+  @keyframes pulseSw{0%,100%{box-shadow:0 0 0 0 rgba(185,140,255,0)}50%{box-shadow:0 0 0 8px rgba(185,140,255,.18)}}
+  /* ИИ-диспетчер над развилкой */
+  .dispatcher{position:absolute;left:48%;top:-14px;transform:translateX(-50%);font-size:12px;
+    color:var(--validation);white-space:nowrap;opacity:0}
+  .scene2.show .lane.ai .dispatcher{animation:disp 3.6s ease-in-out infinite}
+  @keyframes disp{0%,30%{opacity:0}45%,75%{opacity:1}90%,100%{opacity:0}}
+  /* вагон-задача катится по рельсе */
+  .wagon{position:absolute;top:40px;left:7%;width:40px;height:30px;border-radius:8px;
+    background:linear-gradient(180deg,#ffd479,#f5b14b);color:#3a2a06;display:grid;place-items:center;
+    font-size:15px;transform:translateX(-50%);z-index:3}
+  .scene2.show .lane.rule .wagon{animation:rollRule 3.6s ease-in-out infinite}
+  @keyframes rollRule{0%{left:7%}100%{left:90%}}
+  .scene2.show .lane.ai .wagon{animation:rollAI 3.6s ease-in-out infinite}
+  @keyframes rollAI{0%{left:7%}38%{left:46%}55%{left:46%}100%{left:90%}} /* пауза у стрелки, пока ИИ думает */
+  .s2foot{text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1>Как работает состояние задачи</h1>
+    <div class="sub">День 13 · оркестратор ведёт задачу по этапам, на передаче спрашивает человека, прогресс живёт на диске</div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="orch-row"><div class="orch" id="orch">
+      <div class="t">Оркестратор</div><div class="d">держит состояние · передаёт результат дальше · решает переход</div>
+    </div></div>
+
+    <div class="nodes-row" id="nodes">
+      <div class="bus" id="bus"></div>
+      <div class="node" id="n0" style="--c:var(--research)">
+        <div class="drop"></div>
+        <div class="role">этап 1</div><div class="nm">Анализ</div><div class="ag">агент-аналитик</div>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="art">требования</div>
+      </div>
+      <div class="node" id="n1" style="--c:var(--drafting)">
+        <div class="drop"></div>
+        <div class="role">этап 2</div><div class="nm">Составление</div><div class="ag">агент-составитель</div>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="art">текст договора</div>
+      </div>
+      <div class="node" id="n2" style="--c:var(--validation)">
+        <div class="drop"></div>
+        <div class="role">этап 3</div><div class="nm">Проверка</div><div class="ag">агент-контролёр</div>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="art">вердикт</div>
+      </div>
+      <div class="node" id="n3" style="--c:var(--done)">
+        <div class="drop"></div>
+        <div class="role">финал</div><div class="nm">Готово</div><div class="ag">задача решена</div>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="art">документ</div>
+      </div>
+      <div class="link-h" id="linkh"></div>
+    </div>
+
+    <div class="human-row"><div class="human" id="human">
+      <div class="t">Человек на контроле</div>
+      <div class="ask" id="hask">ждёт</div>
+      <div class="verdict" id="hverdict" style="color:var(--human)">✓ Одобрено</div>
+    </div></div>
+
+    <div class="chip" id="task">задача: составить договор аренды</div>
+    <div class="chip" id="doc">готовый документ</div>
+
+    <div class="scene2" id="t1">
+      <div class="lane rule">
+        <div class="cap2"><b>Способ 1 — по правилу (само):</b> <span>стрелку переводит код, как механическая шестерёнка</span></div>
+        <div class="rail"></div>
+        <div class="station s-start">этап готов</div>
+        <div class="switch">⚙</div>
+        <div class="station s-end">дальше →</div>
+        <div class="wagon">📦</div>
+      </div>
+      <div class="lane ai">
+        <div class="cap2"><b>Способ 2 — оркестратор-ИИ:</b> <span>диспетчер думает и сам решает, куда перевести</span></div>
+        <div class="rail"></div>
+        <div class="station s-start">этап готов</div>
+        <div class="dispatcher">🧠 ИИ решает…</div>
+        <div class="switch">⚙</div>
+        <div class="station s-end">дальше →</div>
+        <div class="wagon">📦</div>
+      </div>
+      <div class="s2foot">Вагон — это задача. Разница не в рельсах, а в том, <b>кто переводит стрелку</b>: правило в коде или ИИ-диспетчер.</div>
+    </div>
+
+    <div class="theory" id="theory"><div class="tc">
+      <span class="badge" id="tbadge">теория</span>
+      <h3 id="ttitle"></h3>
+      <ul id="tlist"></ul>
+    </div></div>
+
+    <div class="resume" id="resume"><div class="card">
+      <div class="ic">💾 ↺</div>
+      <div class="h">Пауза переживает закрытие</div>
+      <div class="x">Состояние всё время лежит на диске (этап + артефакты + журнал).
+      Закрыл вкладку, вернулся через неделю — оркестратор поднимает состояние и продолжает
+      с того же этапа, ничего не переспрашивая.</div>
+    </div></div>
+  </div>
+
+  <div class="cap" id="cap"><div class="big">Нажми «Играть»</div><div class="small">покажу весь путь задачи по шагам</div></div>
+  <div class="bar">
+    <button id="restart">⏮ Заново</button>
+    <button id="prev">◀</button>
+    <button class="pp" id="play">▶ Играть</button>
+    <button id="next">▶</button>
+    <div class="pips" id="pips"></div>
+  </div>
+
+<script>
+const $ = id=>document.getElementById(id);
+const nodes=["n0","n1","n2","n3"].map($);
+const drops=nodes.map(n=>n.querySelector(".drop"));
+
+function clearAll(){
+  nodes.forEach(n=>n.classList.remove("on","done","think","show-art"));
+  drops.forEach(d=>d.classList.remove("flow"));
+  $("orch").classList.remove("on");
+  $("human").classList.remove("on","choose");
+  $("linkh").classList.remove("show","flow");
+  $("task").classList.remove("in"); $("doc").classList.remove("in");
+  $("resume").classList.remove("show");
+  $("theory").classList.remove("show");
+  $("t1").classList.remove("show");
+  $("hask").textContent="ждёт";
+}
+function playScene(id){ const el=$(id); el.classList.remove("show"); void el.offsetWidth; el.classList.add("show"); }
+function theory(badge,title,items){
+  $("tbadge").textContent=badge;
+  $("ttitle").textContent=title;
+  $("tlist").innerHTML=items.map(it=>
+    `<li><span class="mk ${it.cls||''}">${it.mk}</span><div><b>${it.b}</b> <span>${it.s||''}</span></div></li>`).join("");
+  $("theory").classList.add("show");
+}
+function cap(big,small){ $("cap").innerHTML=`<div class="big">${big}</div><div class="small">${small||""}</div>`; }
+function markDone(i){ for(let k=0;k<i;k++){nodes[k].classList.add("done");nodes[k].classList.remove("on","think");} }
+
+// сценарий: каждый шаг — функция, рисующая кадр (идемпотентно от чистого состояния)
+const STEPS = [
+  ()=>{ clearAll(); cap("Большую задачу не решить одной репликой",
+        "«составить договор» — это не один ответ чата, а целый процесс из этапов"); $("task").classList.add("in"); },
+
+  ()=>{ clearAll(); $("task").classList.add("in"); $("orch").classList.add("on");
+        cap("Задачу принимает оркестратор","он будет держать состояние и вести её по этапам — как диспетчер"); },
+
+  ()=>{ clearAll(); $("task").classList.add("in"); $("orch").classList.add("on");
+        drops[0].classList.add("flow"); nodes[0].classList.add("on","think");
+        cap("Этап 1 — Анализ","оркестратор зажигает агента-аналитика; у него свой промпт. Он изучает требования"); },
+
+  ()=>{ clearAll(); $("task").classList.add("in"); $("orch").classList.add("on");
+        nodes[0].classList.add("on","show-art");
+        $("linkh").classList.add("show"); $("human").classList.add("on");
+        $("hask").textContent="«Закончил Анализ. Передавать дальше?»";
+        cap("Этап закончился → ПАУЗА","агент не едет сам: он спрашивает человека. Тут задача стоит на паузе"); },
+
+  ()=>{ clearAll(); $("task").classList.add("in"); $("orch").classList.add("on");
+        nodes[0].classList.add("on","show-art"); $("human").classList.add("on","choose");
+        $("hask").textContent="одобрил";
+        cap("Человек одобрил","можно одобрить или внести правку (тогда этап переделают). Здесь — одобрил"); },
+
+  ()=>{ clearAll(); markDone(1); $("orch").classList.add("on");
+        drops[1].classList.add("flow"); nodes[1].classList.add("on","think");
+        cap("Эстафета → Этап 2, Составление","оркестратор передаёт требования следующему агенту; тот пишет договор"); },
+
+  ()=>{ clearAll(); markDone(1); $("orch").classList.add("on");
+        nodes[1].classList.add("on","show-art"); $("human").classList.add("on","choose");
+        $("hask").textContent="одобрил";
+        cap("Готов черновик → пауза → одобрено","снова контроль человека на передаче дальше"); },
+
+  ()=>{ clearAll(); markDone(2); $("orch").classList.add("on");
+        drops[2].classList.add("flow"); nodes[2].classList.add("on","think");
+        cap("Этап 3 — Проверка","агент-контролёр сверяет договор с требованиями: всё закрыто или вернуть на доработку"); },
+
+  ()=>{ clearAll(); markDone(2); $("orch").classList.add("on");
+        nodes[2].classList.add("on","show-art");
+        cap("Вердикт контролёра решает переход","OK → в «Готово». Брак → назад в «Составление» (петля доработки)"); },
+
+  ()=>{ clearAll(); markDone(3); nodes[3].classList.add("on","show-art"); $("doc").classList.add("in");
+        cap("Готово — задача выполнена","прошли весь конвейер: Анализ → Составление → Проверка → Готово"); },
+
+  ()=>{ clearAll(); markDone(4); $("resume").classList.add("show");
+        cap("И главное — пауза не теряется","состояние всё время на диске: закрыл и вернулся — продолжишь с места"); },
+
+  // ── блок «теория»: 4 узла, которые добиваем ──
+  ()=>{ clearAll();
+        cap("Теория · 1 из 4","Кто и как переключает состояния");
+        theory("узел 1","Кто переключает состояния",[
+          {mk:"1",b:"По правилу (детерминированно):",s:"«родился артефакт → следующий этап». Проще и надёжнее."},
+          {mk:"2",cls:"p",b:"Оркестратор-нейронка решает:",s:"отдельный ИИ-диспетчер смотрит и выбирает переход. Гибче, но дороже."},
+          {mk:"✓",cls:"g",b:"У нас:",s:"правило + контролёр-ИИ только в точке «Проверка» (OK→готово, брак→назад)."},
+          {mk:"!",cls:"o",b:"Суть:",s:"переключает КОД по контракту, а модель зовут точечно для оценки — не «сама посреди работы»."},
+        ]); },
+
+  ()=>{ clearAll();
+        cap("Теория · 2 из 4","Три способа поставить паузу");
+        theory("узел 2","Откуда берётся пауза",[
+          {mk:"1",cls:"g",b:"Тумблер «спрашивать между этапами»:",s:"глобально на каждой передаче. — это мы и сделали."},
+          {mk:"2",b:"Агент сам засомневался:",s:"мало данных/противоречие → модель сама просит паузу. Не по расписанию, а по нужде."},
+          {mk:"3",cls:"p",b:"Признак у этапа «валидирует человек»:",s:"точечно — анализ спросить, составление само, проверка спросить."},
+        ]); },
+
+  ()=>{ clearAll();
+        cap("Теория · 3 из 4","Почему пауза не теряется");
+        theory("узел 3","Resume под капотом",[
+          {mk:"1",b:"После каждого шага",s:"состояние (этап + артефакты + журнал) пишется в файл на диск — атомарно (через временный файл, чтобы не остался обрывок)."},
+          {mk:"2",cls:"g",b:"При возврате",s:"программа читает файл и поднимает всё целиком → агент не переспрашивает задачу."},
+          {mk:"3",cls:"o",b:"Память процесса умирает при закрытии, файл — нет",s:"(это разница «оперативка против диска» из Дня 7)."},
+          {mk:"!",cls:"p",b:"Нюанс (насмотренность):",s:"в больших системах (LangGraph) этап при resume стартует с начала → действия делают идемпотентными, чтобы повтор не навредил."},
+        ]); },
+
+  ()=>{ clearAll();
+        cap("Теория · 4 из 4","Почему этап — отдельная сессия со своим промптом");
+        theory("узел 4","Один длинный чат против сессии на этап",[
+          {mk:"✕",cls:"o",b:"Один общий чат — плохо:",s:"роли путаются (аналитик мешается с контролёром), контекст пухнет, модель теряет нить."},
+          {mk:"✓",cls:"g",b:"Сессия на этап — чистый стол:",s:"ровно нужный промпт и нужные данные. Оркестратор передаёт результат дальше как вход."},
+          {mk:"+",b:"Бонус:",s:"на каждый этап можно свою модель (дешёвую/умную) и параллельных агентов (Гладков: один по росправу, второй по патентному)."},
+        ]); },
+];
+
+let cur=-1, timer=null, playing=false;
+$("pips").innerHTML = STEPS.map(()=>'<span class="pip"></span>').join("");
+const pips=[...document.querySelectorAll(".pip")];
+
+function show(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  STEPS[cur]();
+  pips.forEach((p,k)=>p.classList.toggle("on",k===cur));
+}
+function stop(){ playing=false; clearTimeout(timer); $("play").textContent="▶ Играть"; }
+function play(){
+  playing=true; $("play").textContent="⏸ Пауза";
+  if(cur>=STEPS.length-1) show(0);
+  const tick=()=>{
+    if(!playing) return;
+    if(cur>=STEPS.length-1){ stop(); return; }
+    show(cur+1);
+    timer=setTimeout(tick, 2300);
+  };
+  timer=setTimeout(tick, cur<0?300:1200);
+  if(cur<0) show(0);
+}
+$("play").onclick=()=>playing?stop():play();
+$("next").onclick=()=>{stop();show(cur+1);};
+$("prev").onclick=()=>{stop();show(cur-1);};
+$("restart").onclick=()=>{stop();show(0);};
+show(0);
+</script>
+</body>
+</html>

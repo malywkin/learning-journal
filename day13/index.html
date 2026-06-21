@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конвейер агентов · День 13</title>
+<style>
+  :root{
+    --bg:#0f1117; --card:#171a22; --card2:#1d212b; --line:#2a2f3a;
+    --ink:#e8eaed; --muted:#9aa1ad; --faint:#6b7280;
+    --accent:#5b9dff; --good:#3ecf8e; --warn:#f0b549; --bad:#f0726a;
+    --research:#5b9dff; --drafting:#f0b549; --validation:#b08cff; --done:#3ecf8e;
+    --human:#3ecf8e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 80px}
+  header h1{font-size:21px;font-weight:650;letter-spacing:-.02em;margin:0}
+  header .sub{color:var(--muted);font-size:13px;margin-top:3px}
+
+  /* дорожка этапов (как трекинг заказа) */
+  .track{display:flex;align-items:stretch;gap:0;margin:22px 0 8px}
+  .st{flex:1;text-align:center;padding:12px 8px;border:1px solid var(--line);
+    background:var(--card);border-radius:12px;position:relative;transition:.2s}
+  .st .role{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .st .nm{font-weight:600;font-size:14px;margin-top:2px}
+  .st .ag{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .st.done-st{opacity:.7}
+  .st.done-st .nm::after{content:" ✓";color:var(--good)}
+  .st.cur{border-color:transparent;box-shadow:0 0 0 2px var(--c) inset, 0 6px 20px -10px var(--c)}
+  .st.cur .nm{color:var(--c)}
+  .conn{flex:0 0 22px;align-self:center;color:var(--faint);text-align:center}
+  @media(max-width:680px){.track{flex-direction:column}.conn{transform:rotate(90deg);padding:2px 0}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+  .start{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .start input[type=text]{flex:1;min-width:240px;background:var(--card2);border:1px solid var(--line);
+    color:var(--ink);border-radius:10px;padding:11px 13px;font-size:14.5px;outline:none}
+  .start input:focus{border-color:var(--accent)}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--ink);padding:10px 15px;font-size:14px;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.go{background:var(--accent);border-color:var(--accent);color:#08111f;font-weight:650}
+  button.ok{background:var(--good);border-color:var(--good);color:#06231a;font-weight:650}
+  button:disabled{opacity:.4;cursor:default}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
+    cursor:pointer;user-select:none;border:1px solid var(--line);border-radius:999px;padding:7px 12px}
+  .toggle .dot{width:34px;height:20px;border-radius:999px;background:#39404d;position:relative;transition:.15s}
+  .toggle .dot::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on{color:var(--good);border-color:#2c5b46}
+  .toggle.on .dot{background:var(--good)} .toggle.on .dot::after{left:16px}
+
+  /* лента работы агентов */
+  .feed{margin-top:8px;display:flex;flex-direction:column;gap:12px}
+  .msg{display:flex;gap:11px;align-items:flex-start}
+  .av{flex:0 0 34px;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    font-weight:700;font-size:13px;color:#08111f}
+  .bub{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .bub .who{font-size:12px;color:var(--muted);margin-bottom:5px}
+  .bub .who b{color:var(--ink)}
+  .bub .body{font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+  .bub.collapsed .body{max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent)}
+  .bub .more{margin-top:6px;font-size:12px;color:var(--accent);cursor:pointer}
+  .msg.human{flex-direction:row-reverse}
+  .msg.human .av{background:var(--human)}
+  .msg.human .bub{background:#15241d;border-color:#2c5b46}
+  .move{align-self:center;font-size:12px;color:var(--faint);background:var(--card2);
+    border:1px dashed var(--line);border-radius:999px;padding:4px 12px}
+
+  /* панель «агент спрашивает» (HITL пауза) */
+  .ask{margin-top:16px;border:1px solid var(--warn);background:#241f12;border-radius:14px;padding:15px}
+  .ask .q{font-size:14.5px;margin-bottom:11px}
+  .ask .q b{color:var(--warn)}
+  .ask .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .ask .revbox{display:none;margin-top:11px;gap:8px}
+  .ask .revbox.show{display:flex}
+  .ask .revbox input{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
+
+  /* индикатор работы */
+  .think{margin-top:16px;display:none;align-items:center;gap:10px;color:var(--accent);
+    background:#13203a;border:1px solid #284574;border-radius:12px;padding:12px 15px;font-size:14px}
+  .think.show{display:flex}
+  .spin{width:15px;height:15px;border:2px solid #2b3f63;border-top-color:var(--accent);
+    border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* подвал: карточка состояния (что под капотом) */
+  .hood{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;font-size:13px}
+  .hood .k{color:var(--faint)} .hood .v{color:var(--ink)}
+  .hood .full{grid-column:1/3}
+  .savedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:1px}
+  .done-banner{margin-top:16px;background:#13261d;border:1px solid #2c5b46;border-radius:14px;
+    padding:15px;color:var(--good);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Конвейер агентов с человеком на контроле</h1>
+    <div class="sub">День 13 · задача идёт по этапам сама; на передаче спрашивает тебя · состояние живёт на диске</div>
+  </header>
+
+  <div class="track" id="track"></div>
+
+  <div class="panel">
+    <div class="start">
+      <input type="text" id="goal" placeholder="Поручи задачу, напр.: составить договор аренды квартиры">
+      <button class="go" id="startBtn">Запустить</button>
+      <div class="toggle on" id="askToggle"><span class="dot"></span><span id="askLbl">спрашивать меня между этапами</span></div>
+      <button id="resetBtn">Сбросить</button>
+    </div>
+  </div>
+
+  <div class="think" id="think"><span class="spin"></span><span id="thinkMsg">агент работает…</span></div>
+
+  <div class="feed" id="feed"></div>
+
+  <div class="ask" id="ask" style="display:none">
+    <div class="q" id="askQ"></div>
+    <div class="acts">
+      <button class="ok" id="approveBtn">Одобрить, передать дальше →</button>
+      <button id="reviseToggle">Внести правку</button>
+    </div>
+    <div class="revbox" id="revbox">
+      <input type="text" id="reviseInput" placeholder="Что поправить на этом этапе?">
+      <button class="go" id="reviseSend">Переделать</button>
+    </div>
+  </div>
+
+  <div class="done-banner" id="doneBanner" style="display:none">Задача выполнена — пайплайн дошёл до «Готово».</div>
+
+  <div class="hood" id="hood" style="display:none">
+    <div class="k">этап (stage)</div><div class="v" id="h-stage">—</div>
+    <div class="k">текущий шаг</div><div class="v" id="h-step">—</div>
+    <div class="k">ожидаемое действие</div><div class="v" id="h-expect">—</div>
+    <div class="k">правок внесено</div><div class="v" id="h-rev">0</div>
+    <div class="full"><span class="savedot"></span><span id="h-saved">состояние сохранено на диск — можно закрыть вкладку и вернуться</span> · токенов: <b id="h-tok">0</b></div>
+  </div>
+</div>
+
+<script>
+const AGENTS = {
+  research:   {role:"Аналитик",   c:"--research",   ini:"А", verb:"изучил требования и нормы"},
+  drafting:   {role:"Составитель",c:"--drafting",   ini:"С", verb:"составил документ"},
+  validation: {role:"Контролёр",  c:"--validation", ini:"К", verb:"проверил документ"},
+  done:       {role:"Готово",     c:"--done",        ini:"✓", verb:""},
+};
+const NAMES = {research:"Анализ", drafting:"Составление", validation:"Проверка", done:"Готово"};
+const ORDER = ["research","drafting","validation","done"];
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v);
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+
+function drawTrack(stage){
+  const cur = ORDER.indexOf(stage);
+  const out = [];
+  ORDER.forEach((s,i)=>{
+    const a = AGENTS[s];
+    const state = i<cur ? "done-st" : (i===cur ? "cur" : "");
+    out.push(`<div class="st ${state}" style="--c:${css(a.c)}">
+      <div class="role">${s==="done"?"финал":"этап "+(i+1)}</div>
+      <div class="nm">${NAMES[s]}</div>
+      <div class="ag">${s==="done"?"задача готова":a.role}</div></div>`);
+    if(i<ORDER.length-1) out.push(`<div class="conn">→</div>`);
+  });
+  $("track").innerHTML = out.join("");
+}
+
+function feedItem(ev){
+  if(ev.kind==="move"){
+    return `<div class="move">${esc(ev.text)}</div>`;
+  }
+  if(ev.kind==="revise"){
+    return `<div class="msg human"><div class="av">Я</div>
+      <div class="bub"><div class="who"><b>Ты</b> · правка</div>
+      <div class="body">${esc(ev.text.replace(/^Правка от человека:\s*/,""))}</div></div></div>`;
+  }
+  // work / ask
+  const a = AGENTS[ev.stage] || AGENTS.research;
+  if(ev.kind==="ask"){
+    return ""; // вопрос показываем отдельной панелью .ask, не в ленте
+  }
+  const long = (ev.text||"").length>320;
+  return `<div class="msg"><div class="av" style="background:${css(a.c)}">${a.ini}</div>
+    <div class="bub ${long?'collapsed':''}">
+      <div class="who"><b>${a.role}</b> · ${a.verb}</div>
+      <div class="body">${esc(ev.text)}</div>
+      ${long?'<div class="more">показать полностью ↓</div>':''}
+    </div></div>`;
+}
+
+function render(p){
+  if(p.empty || !p.stage){
+    drawTrack("research");
+    $("feed").innerHTML="";
+    $("ask").style.display="none"; $("doneBanner").style.display="none"; $("hood").style.display="none";
+    return;
+  }
+  drawTrack(p.stage);
+  $("feed").innerHTML = (p.events||[]).map(feedItem).join("");
+  // раскрытие длинных
+  document.querySelectorAll(".bub .more").forEach(el=>{
+    el.onclick=()=>{el.parentElement.classList.remove("collapsed");el.remove();};
+  });
+
+  // панель вопроса (пауза)
+  if(p.awaiting && p.stage!=="done"){
+    const lastAsk = [...(p.events||[])].reverse().find(e=>e.kind==="ask");
+    $("askQ").innerHTML = `<b>${AGENTS[p.stage].role}:</b> ${esc(lastAsk?lastAsk.text:"Закончил этап. Передавать дальше?")}`;
+    $("ask").style.display="block";
+  } else {
+    $("ask").style.display="none";
+  }
+  $("revbox").classList.remove("show");
+
+  $("doneBanner").style.display = p.stage==="done" ? "block" : "none";
+
+  // карточка состояния (под капотом)
+  $("hood").style.display="grid";
+  $("h-stage").textContent = `${p.stage} (${p.title})`;
+  $("h-step").textContent = p.current_step;
+  $("h-expect").textContent = p.expected_action;
+  $("h-rev").textContent = p.revision;
+  $("h-tok").textContent = p.tokens||0;
+
+  // тумблер
+  $("askToggle").classList.toggle("on", p.ask_between);
+}
+
+async function api(path, body){
+  const opt = {method:"POST",headers:{"Content-Type":"application/json"},
+               body:JSON.stringify(body||{})};
+  if(path.endsWith("/state")) {opt.method="GET"; delete opt.body; delete opt.headers;}
+  const r = await fetch(path, opt);
+  return r.json();
+}
+function think(b,msg){ $("think").classList.toggle("show",b); if(msg)$("thinkMsg").textContent=msg;
+  ["startBtn","approveBtn","reviseSend"].forEach(id=>{const e=$(id); if(e)e.disabled=b;}); }
+
+$("askToggle").onclick = async ()=>{
+  const cur = $("askToggle").classList.contains("on");
+  const r = await api("/api/toggle",{ask_between:!cur});
+  if(r && !r.empty) render(r); else $("askToggle").classList.toggle("on",!cur);
+};
+$("startBtn").onclick = async ()=>{
+  const goal=$("goal").value.trim(); if(!goal){$("goal").focus();return;}
+  const ask=$("askToggle").classList.contains("on");
+  think(true,"Аналитик изучает задачу…");
+  render(await api("/api/start",{goal,ask_between:ask})); think(false);
+};
+$("approveBtn").onclick = async ()=>{
+  think(true,"передаю дальше, следующий агент работает…");
+  render(await api("/api/approve",{})); think(false);
+};
+$("reviseToggle").onclick = ()=> $("revbox").classList.toggle("show");
+$("reviseSend").onclick = async ()=>{
+  const note=$("reviseInput").value.trim(); if(!note){$("reviseInput").focus();return;}
+  think(true,"переделываю этап с твоей правкой…");
+  render(await api("/api/revise",{note})); $("reviseInput").value=""; think(false);
+};
+$("resetBtn").onclick = async ()=>{ await api("/api/reset",{}); render({empty:true}); $("goal").value=""; };
+
+api("/api/state").then(render);
+</script>
+</body>
+</html>
