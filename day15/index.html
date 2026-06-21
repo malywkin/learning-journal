@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контролируемые переходы · День 15</title>
+<style>
+  :root{
+    --bg:#0f1117; --card:#171a22; --card2:#1d212b; --line:#2a2f3a;
+    --ink:#e8eaed; --muted:#9aa1ad; --faint:#6b7280;
+    --accent:#5b9dff; --good:#3ecf8e; --warn:#f0b549; --bad:#f0726a; --human:#3ecf8e;
+    --planning:#5b9dff; --execution:#f0b549; --validation:#b08cff; --done:#3ecf8e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif}
+  .wrap{max-width:940px;margin:0 auto;padding:26px 20px 90px}
+  header h1{font-size:21px;font-weight:650;letter-spacing:-.02em;margin:0}
+  header .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  h3{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:0 0 9px}
+
+  /* дорожка этапов с воротами-замками между ними */
+  .track{display:flex;align-items:stretch;gap:0;margin:22px 0 6px}
+  .st{flex:1;text-align:center;padding:12px 8px;border:1px solid var(--line);
+    background:var(--card);border-radius:12px;position:relative;transition:.2s}
+  .st .role{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .st .nm{font-weight:600;font-size:14px;margin-top:2px}
+  .st.done-st{opacity:.65}.st.done-st .nm::after{content:" ✓";color:var(--good)}
+  .st.cur{border-color:transparent;box-shadow:0 0 0 2px var(--c) inset,0 6px 20px -10px var(--c)}
+  .st.cur .nm{color:var(--c)}
+  .gate-conn{flex:0 0 30px;align-self:center;text-align:center;font-size:16px}
+  .gate-conn .lk{font-size:15px}
+  @media(max-width:680px){.track{flex-direction:column}.gate-conn{transform:rotate(90deg);padding:2px 0}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+  .start{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .start input[type=text]{flex:1;min-width:240px;background:var(--card2);border:1px solid var(--line);
+    color:var(--ink);border-radius:10px;padding:11px 13px;font-size:14.5px;outline:none}
+  .start input:focus{border-color:var(--accent)}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--ink);padding:9px 14px;font-size:13.5px;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.go{background:var(--accent);border-color:var(--accent);color:#08111f;font-weight:650}
+  button.ok{background:var(--good);border-color:var(--good);color:#06231a;font-weight:650}
+  button.bad{background:var(--bad);border-color:var(--bad);color:#2a0d0b;font-weight:600}
+  button:disabled{opacity:.35;cursor:default}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
+    cursor:pointer;user-select:none;border:1px solid var(--line);border-radius:999px;padding:7px 12px}
+  .toggle .dot{width:34px;height:20px;border-radius:999px;background:#39404d;position:relative;transition:.15s}
+  .toggle .dot::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on{color:var(--good);border-color:#2c5b46}
+  .toggle.on .dot{background:var(--good)}.toggle.on .dot::after{left:16px}
+
+  /* ВОРОТА на разрешённые переходы */
+  .gates{display:flex;flex-direction:column;gap:8px}
+  .gaterow{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:10px 13px}
+  .gaterow .gh{display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
+  .gaterow .gh b{font-weight:600}
+  .badge{font-size:11.5px;padding:2px 9px;border-radius:999px;font-weight:600}
+  .badge.open{background:#13261d;color:var(--good);border:1px solid #2c5b46}
+  .badge.shut{background:#2a1614;color:var(--bad);border:1px solid #5b2f2c}
+  .checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chk{font-size:12px;padding:3px 9px;border-radius:8px;border:1px solid var(--line)}
+  .chk.y{color:var(--good);border-color:#2c5b46;background:#10201a}
+  .chk.n{color:var(--bad);border-color:#5b2f2c;background:#23120f}
+
+  /* проба перехода (попытка недопустимого) */
+  .try{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .tryres{margin-top:10px;font-size:13.5px;padding:9px 12px;border-radius:10px;display:none}
+  .tryres.show{display:block}
+  .tryres.r-off{background:#23120f;border:1px solid #5b2f2c;color:var(--bad)}
+  .tryres.r-gate{background:#241f12;border:1px solid #5b4a22;color:var(--warn)}
+  .tryres.r-open{background:#10201a;border:1px solid #2c5b46;color:var(--good)}
+
+  /* лента работы агентов */
+  .feed{margin-top:8px;display:flex;flex-direction:column;gap:11px}
+  .msg{display:flex;gap:11px;align-items:flex-start}
+  .av{flex:0 0 34px;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    font-weight:700;font-size:13px;color:#08111f}
+  .bub{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .bub .who{font-size:12px;color:var(--muted);margin-bottom:5px}.bub .who b{color:var(--ink)}
+  .bub .body{font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+  .bub.collapsed .body{max-height:140px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent)}
+  .bub .more{margin-top:6px;font-size:12px;color:var(--accent);cursor:pointer}
+  .move{align-self:center;font-size:12px;color:var(--faint);background:var(--card2);
+    border:1px dashed var(--line);border-radius:999px;padding:4px 12px}
+  .blocked{align-self:center;font-size:12.5px;color:var(--bad);background:#1f1311;
+    border:1px solid #5b2f2c;border-radius:999px;padding:5px 13px}
+
+  /* панель валидаторов (рой) */
+  .lenses{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:4px}
+  @media(max-width:680px){.lenses{grid-template-columns:1fr}}
+  .lens{border:1px solid var(--line);border-radius:11px;padding:11px;background:var(--card2)}
+  .lens .lt{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .lens .lv{font-weight:650;font-size:13px}
+  .lens.y .lv{color:var(--good)}.lens.n .lv{color:var(--bad)}
+  .lens .ln{font-size:12.5px;color:var(--ink);margin-top:5px}
+  .decision{margin-top:11px;font-size:13.5px;padding:9px 13px;border-radius:10px}
+  .decision.pass{background:#10201a;border:1px solid #2c5b46;color:var(--good)}
+  .decision.fail{background:#241f12;border:1px solid #5b4a22;color:var(--warn)}
+  .decision.abstain{background:#1d1830;border:1px solid #3d3163;color:#c4b5fd}
+
+  /* пауза / эскалация */
+  .ask{margin-top:16px;border:1px solid var(--warn);background:#241f12;border-radius:14px;padding:15px}
+  .ask.esc{border-color:#6d5cc0;background:#1d1830}
+  .ask .q{font-size:14.5px;margin-bottom:11px}.ask .q b{color:var(--warn)}
+  .ask.esc .q b{color:#c4b5fd}
+  .ask .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .revbox{display:none;margin-top:11px;gap:8px}.revbox.show{display:flex}
+  .revbox input{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
+
+  .think{margin-top:16px;display:none;align-items:center;gap:10px;color:var(--accent);
+    background:#13203a;border:1px solid #284574;border-radius:12px;padding:12px 15px;font-size:14px}
+  .think.show{display:flex}
+  .spin{width:15px;height:15px;border:2px solid #2b3f63;border-top-color:var(--accent);
+    border-radius:50%;animation:sp .7s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+
+  .hood{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:9px 18px;
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;font-size:13px}
+  .hood .k{color:var(--faint)}.hood .v{color:var(--ink)}.hood .full{grid-column:1/3}
+  .savedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:1px}
+  .done-banner{margin-top:16px;background:#13261d;border:1px solid #2c5b46;border-radius:14px;
+    padding:15px;color:var(--good);font-weight:600}
+  .hint{color:var(--faint);font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Ассистент с контролируемым жизненным циклом задачи</h1>
+    <div class="sub">День 15 · задача идёт по рельсам, но КАЖДЫЙ переход открывают ВОРОТА
+      (предусловия) · проверку ведёт рой валидаторов · состояние живёт на диске</div>
+  </header>
+
+  <div class="track" id="track"></div>
+
+  <div class="panel">
+    <div class="start">
+      <input type="text" id="goal" placeholder="Поручи задачу, напр.: составить договор аренды квартиры">
+      <button class="go" id="startBtn">Запустить</button>
+      <div class="toggle on" id="askToggle"><span class="dot"></span><span>спрашивать между этапами</span></div>
+      <button id="resetBtn">Сбросить</button>
+    </div>
+  </div>
+
+  <div class="panel" id="gatesPanel" style="display:none">
+    <h3>Ворота на следующий переход — что должно быть выполнено</h3>
+    <div class="gates" id="gates"></div>
+  </div>
+
+  <div class="panel" id="tryPanel" style="display:none">
+    <h3>Попробовать перейти в состояние (проверка без изменения)</h3>
+    <div class="try" id="tryBtns"></div>
+    <div class="tryres" id="tryRes"></div>
+    <div class="hint">Рельсы говорят «нарисована ли стрелка», ворота — «есть ли пропуск».
+      Прыжок мимо рельсов = недопустимое состояние; закрытые ворота = предусловие не выполнено.</div>
+  </div>
+
+  <div class="think" id="think"><span class="spin"></span><span id="thinkMsg">агент работает…</span></div>
+
+  <div class="feed" id="feed"></div>
+
+  <div class="panel" id="panelBox" style="display:none">
+    <h3>Рой валидаторов · разные линзы (read-only, решает оркестратор)</h3>
+    <div class="lenses" id="lenses"></div>
+    <div class="decision" id="decision"></div>
+  </div>
+
+  <div class="ask" id="ask" style="display:none">
+    <div class="q" id="askQ"></div>
+    <div class="acts" id="askActs"></div>
+    <div class="revbox" id="revbox">
+      <input type="text" id="reviseInput" placeholder="Что поправить на этом этапе?">
+      <button class="go" id="reviseSend">Переделать</button>
+    </div>
+  </div>
+
+  <div class="done-banner" id="doneBanner" style="display:none">Задача выполнена — пайплайн дошёл до «Готово» через все ворота.</div>
+
+  <div class="hood" id="hood" style="display:none">
+    <div class="k">этап (stage)</div><div class="v" id="h-stage">—</div>
+    <div class="k">текущий шаг</div><div class="v" id="h-step">—</div>
+    <div class="k">ожидаемое действие</div><div class="v" id="h-expect">—</div>
+    <div class="k">план одобрен</div><div class="v" id="h-appr">—</div>
+    <div class="k">доработок</div><div class="v" id="h-rev">0</div>
+    <div class="k">токенов</div><div class="v" id="h-tok">0</div>
+    <div class="full"><span class="savedot"></span>состояние сохранено на диск —
+      <a href="#" id="reloadLink" style="color:var(--accent)">перечитать с диска (resume)</a>
+      (выбрасывает объект из памяти и поднимает из файла — как пауза/продолжение)</div>
+  </div>
+</div>
+
+<script>
+const AG = {
+  planning:   {role:"Планировщик", c:"--planning",   ini:"П"},
+  execution:  {role:"Составитель",  c:"--execution",  ini:"Р"},
+  validation: {role:"Рой проверки", c:"--validation", ini:"К"},
+  done:       {role:"Готово",       c:"--done",       ini:"✓"},
+};
+const TITLES = {planning:"План", execution:"Реализация", validation:"Проверка", done:"Готово"};
+const ORDER = ["planning","execution","validation","done"];
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v);
+const esc = s => (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function drawTrack(p){
+  const cur = ORDER.indexOf(p.stage);
+  const gates = p.gates || {};
+  const out = [];
+  ORDER.forEach((s,i)=>{
+    const a = AG[s];
+    const cls = i<cur ? "done-st" : (i===cur ? "cur" : "");
+    out.push(`<div class="st ${cls}" style="--c:${css(a.c)}">
+      <div class="role">${s==="done"?"финал":"этап "+(i+1)}</div>
+      <div class="nm">${TITLES[s]}</div></div>`);
+    if(i<ORDER.length-1){
+      // замок на стрелке между текущим и следующим
+      let lk = "→";
+      if(i===cur){ const g = gates[ORDER[i+1]]; lk = g ? (g.passed? "🔓":"🔒") : "→"; }
+      out.push(`<div class="gate-conn"><span class="lk">${lk}</span></div>`);
+    }
+  });
+  $("track").innerHTML = out.join("");
+}
+
+function drawGates(p){
+  const gates = p.gates || {};
+  const keys = Object.keys(gates);
+  if(!keys.length){ $("gatesPanel").style.display="none"; return; }
+  $("gatesPanel").style.display="block";
+  $("gates").innerHTML = keys.map(to=>{
+    const g = gates[to];
+    const checks = g.checks.map(c=>`<span class="chk ${c.ok?'y':'n'}">${c.ok?'✓':'✗'} ${esc(c.reason)}</span>`).join("");
+    return `<div class="gaterow">
+      <div class="gh"><b>${TITLES[p.stage]} → ${TITLES[to]||to}</b>
+        <span class="badge ${g.passed?'open':'shut'}">${g.passed?'ВОРОТА ОТКРЫТЫ':'ВОРОТА ЗАКРЫТЫ'}</span></div>
+      <div class="checks">${checks||'<span class="chk y">без предусловий</span>'}</div>
+    </div>`;
+  }).join("");
+}
+
+function drawTry(p){
+  $("tryPanel").style.display="block";
+  $("tryBtns").innerHTML = ORDER.map(s=>
+    `<button data-to="${s}" ${s===p.stage?'disabled':''}>→ ${TITLES[s]}</button>`).join("");
+  $("tryBtns").querySelectorAll("button").forEach(b=>{
+    b.onclick = async ()=>{
+      const r = await api("/api/try",{to:b.dataset.to});
+      const box = $("tryRes"); box.className = "tryres show ";
+      if(r.empty){ box.textContent="Сначала поручи задачу."; return; }
+      if(r.ok){ box.className+="r-open"; box.textContent = `→ ${TITLES[b.dataset.to]}: ОТКРЫТО — рельсы и ворота пройдены.`; }
+      else if(r.kind==="off_rails"){ box.className+="r-off";
+        box.textContent = `→ ${TITLES[b.dataset.to]}: МИМО РЕЛЬСОВ (недопустимое состояние) — ${r.reason}.`; }
+      else { box.className+="r-gate";
+        box.textContent = `→ ${TITLES[b.dataset.to]}: ВОРОТА ЗАКРЫТЫ — ${r.reason}.`; }
+    };
+  });
+}
+
+function feedItem(ev){
+  if(ev.kind==="move") return `<div class="move">${esc(ev.text)}</div>`;
+  if(ev.kind==="blocked") return `<div class="blocked">⛔ ${esc(ev.text)}</div>`;
+  if(ev.kind==="ask") return "";
+  if(ev.kind==="revise") return `<div class="msg"><div class="av" style="background:var(--human)">Я</div>
+    <div class="bub"><div class="who"><b>Ты</b></div><div class="body">${esc(ev.text)}</div></div></div>`;
+  if(ev.kind==="approve") return `<div class="move" style="color:var(--good)">${esc(ev.text)}</div>`;
+  if(ev.kind==="escalate") return `<div class="blocked" style="color:#c4b5fd;border-color:#3d3163;background:#1d1830">⚖ ${esc(ev.text)}</div>`;
+  const a = AG[ev.stage] || AG.planning;
+  const long = (ev.text||"").length>300;
+  return `<div class="msg"><div class="av" style="background:${css(a.c)}">${a.ini}</div>
+    <div class="bub ${long?'collapsed':''}">
+      <div class="who"><b>${a.role}</b> · этап «${TITLES[ev.stage]||ev.stage}»</div>
+      <div class="body">${esc(ev.text)}</div>
+      ${long?'<div class="more">показать полностью ↓</div>':''}</div></div>`;
+}
+
+function drawPanel(p){
+  const v = p.validation || {};
+  if(!v.lenses || !v.lenses.length){ $("panelBox").style.display="none"; return; }
+  $("panelBox").style.display="block";
+  $("lenses").innerHTML = v.lenses.map(l=>
+    `<div class="lens ${l.ok?'y':'n'}"><div class="lt">${esc(l.title)}</div>
+      <div class="lv">${l.ok?'✓ чисто':'✗ проблема'}</div>
+      <div class="ln">${esc(l.note||'—')}</div></div>`).join("");
+  const d = v.decision||"";
+  const lbl = {pass:"РЕШЕНИЕ: PASS — все линзы чисто",
+               fail:"РЕШЕНИЕ: на доработку — есть замечания",
+               abstain:"РЕШЕНИЕ: ВОЗДЕРЖАНИЕ — линзы разошлись, нужно решение человека"}[d]||d;
+  $("decision").className = "decision "+d;
+  $("decision").textContent = lbl;
+}
+
+function render(p){
+  if(p.empty || !p.stage){
+    drawTrack({stage:"planning",gates:{}});
+    ["gatesPanel","tryPanel","panelBox","hood","ask","doneBanner"].forEach(id=>$(id).style.display="none");
+    $("feed").innerHTML=""; return;
+  }
+  drawTrack(p); drawGates(p); drawTry(p);
+  $("feed").innerHTML = (p.events||[]).map(feedItem).join("");
+  document.querySelectorAll(".bub .more").forEach(el=>{
+    el.onclick=()=>{el.parentElement.classList.remove("collapsed");el.remove();};
+  });
+  drawPanel(p);
+
+  // пауза / эскалация
+  const ask=$("ask");
+  if(p.escalated){
+    ask.style.display="block"; ask.className="ask esc";
+    $("askQ").innerHTML = `<b>Воздержание панели.</b> Линзы разошлись — кворуму доверять нельзя.
+      Прими документ как есть или верни на доработку.`;
+    $("askActs").innerHTML = `<button class="ok" id="acceptBtn">Принять, в «Готово» →</button>
+      <button class="bad" id="reworkBtn">Вернуть на доработку</button>
+      <button id="reviseToggle">Правка с комментарием</button>`;
+    wireAsk(true);
+  } else if(p.awaiting && p.stage!=="done"){
+    ask.style.display="block"; ask.className="ask";
+    const lastAsk=[...(p.events||[])].reverse().find(e=>e.kind==="ask");
+    $("askQ").innerHTML = `<b>${AG[p.stage].role}:</b> ${esc(lastAsk?lastAsk.text:"Передавать дальше?")}`;
+    $("askActs").innerHTML = `<button class="ok" id="approveBtn">Одобрить, дальше →</button>
+      <button id="reviseToggle">Внести правку</button>`;
+    wireAsk(false);
+  } else { ask.style.display="none"; }
+  $("revbox").classList.remove("show");
+
+  $("doneBanner").style.display = p.stage==="done" ? "block":"none";
+
+  $("hood").style.display="grid";
+  $("h-stage").textContent = `${p.stage} (${p.title})`;
+  $("h-step").textContent = p.current_step;
+  $("h-expect").textContent = p.expected_action;
+  $("h-appr").textContent = p.plan_approved ? "да" : "нет";
+  $("h-rev").textContent = p.revision;
+  $("h-tok").textContent = p.tokens||0;
+  $("askToggle").classList.toggle("on", p.ask_between);
+}
+
+function wireAsk(esc){
+  if(esc){
+    $("acceptBtn").onclick=async()=>{think(true,"оформляю финал…");render(await api("/api/resolve",{accept:true}));think(false);};
+    $("reworkBtn").onclick=async()=>{think(true,"возвращаю на доработку…");render(await api("/api/resolve",{accept:false}));think(false);};
+  } else {
+    $("approveBtn").onclick=async()=>{think(true,"передаю дальше, следующий агент работает…");render(await api("/api/approve",{}));think(false);};
+  }
+  $("reviseToggle").onclick=()=>$("revbox").classList.toggle("show");
+}
+
+async function api(path, body){
+  const opt={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})};
+  if(path.endsWith("/state")){opt.method="GET";delete opt.body;delete opt.headers;}
+  const r=await fetch(path,opt); return r.json();
+}
+function think(b,msg){ $("think").classList.toggle("show",b); if(msg)$("thinkMsg").textContent=msg;
+  ["startBtn"].forEach(id=>{const e=$(id);if(e)e.disabled=b;}); }
+
+$("askToggle").onclick=async()=>{
+  const cur=$("askToggle").classList.contains("on");
+  const r=await api("/api/toggle",{ask_between:!cur});
+  if(r&&!r.empty)render(r); else $("askToggle").classList.toggle("on",!cur);
+};
+$("startBtn").onclick=async()=>{
+  const goal=$("goal").value.trim(); if(!goal){$("goal").focus();return;}
+  const ask=$("askToggle").classList.contains("on");
+  think(true,"Планировщик составляет план…");
+  render(await api("/api/start",{goal,ask_between:ask})); think(false);
+};
+$("reviseSend").onclick=async()=>{
+  const note=$("reviseInput").value.trim(); if(!note){$("reviseInput").focus();return;}
+  think(true,"переделываю с твоей правкой…");
+  render(await api("/api/revise",{note})); $("reviseInput").value=""; think(false);
+};
+$("resetBtn").onclick=async()=>{await api("/api/reset",{});render({empty:true});$("goal").value="";};
+$("reloadLink").onclick=async(e)=>{e.preventDefault();render(await api("/api/state"));};
+
+api("/api/state").then(render);
+</script>
+</body>
+</html>
