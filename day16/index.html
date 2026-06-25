@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 16 — заглядываем в готовый MCP-сервер</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1e222e; --line:#2a2f3d;
+    --txt:#e7e9ee; --mut:#9aa3b2; --accent:#7c83ff; --accent2:#39d0a8;
+    --req:#ffcf6b; --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#1b2030 0,var(--bg) 55%);
+    color:var(--txt);font:16px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 20px 64px}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px}
+  .sub{color:var(--mut);margin:0 0 24px;max-width:680px}
+  .sub b{color:var(--txt);font-weight:600}
+
+  .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  label.lbl{color:var(--mut);font-size:14px}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:10px;padding:9px 12px;font-size:15px;outline:none}
+  button{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:10px 18px;font-size:15px;font-weight:600;transition:.15s}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.5;cursor:default}
+  .url{margin-left:auto;color:var(--mut);font:13px/1 var(--mono)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;margin-top:18px}
+  .card h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--mut);margin:0 0 14px;font-weight:600}
+
+  /* шаги */
+  .step{display:flex;align-items:center;gap:12px;padding:8px 0;opacity:.35;transition:.25s}
+  .step.on{opacity:1}
+  .dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .step.on .dot{border-color:var(--accent2);background:rgba(57,208,168,.12)}
+  .dot svg{width:14px;height:14px;opacity:0;transition:.2s}
+  .step.on .dot svg{opacity:1}
+  .step .txt{flex:1}
+  .step .ms{color:var(--mut);font:13px/1 var(--mono)}
+
+  .srv{display:none;margin-top:18px;align-items:center;gap:10px;flex-wrap:wrap;
+    background:linear-gradient(90deg,rgba(124,131,255,.12),transparent);
+    border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+  .srv.show{display:flex}
+  .srv .name{font-weight:600}
+  .srv .ver{font:13px/1 var(--mono);color:var(--mut)}
+  .pill{margin-left:auto;background:var(--accent);color:#fff;border-radius:20px;
+    padding:4px 12px;font-size:13px;font-weight:600}
+
+  .menuhint{color:var(--mut);font-size:14px;margin:22px 0 10px}
+  .tools{display:grid;grid-template-columns:1fr;gap:12px}
+  .tool{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;cursor:pointer;transition:.15s}
+  .tool:hover{border-color:var(--accent)}
+  .tool .top{display:flex;align-items:center;gap:10px}
+  .tool .nm{font:600 15px/1.2 var(--mono);color:#cdd2ff}
+  .tool .chev{margin-left:auto;color:var(--mut);transition:.2s}
+  .tool.open .chev{transform:rotate(90deg)}
+  .tool .desc{color:var(--mut);font-size:14px;margin:8px 0 0}
+  .params{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .param{font:13px/1 var(--mono);background:#11141d;border:1px solid var(--line);
+    border-radius:7px;padding:5px 9px;color:#c7ccd6}
+  .param.req{border-color:var(--req);color:var(--req)}
+  .raw{display:none;margin-top:12px}
+  .tool.open .raw{display:block}
+  pre{margin:0;background:#0b0d13;border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;overflow:auto;font:13px/1.5 var(--mono);color:#aeb6c4}
+
+  details.hood{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 20px}
+  details.hood summary{cursor:pointer;color:var(--mut);padding:12px 0;font-size:14px;list-style:none}
+  details.hood summary::-webkit-details-marker{display:none}
+  details.hood summary b{color:var(--txt)}
+  .hood .lab{color:var(--mut);font-size:13px;margin:8px 0 6px}
+  .err{display:none;margin-top:18px;background:rgba(255,90,90,.08);
+    border:1px solid #5a2630;border-radius:12px;padding:14px 18px;color:#ffb4b4}
+  .err.show{display:block}
+  .legend{color:var(--mut);font-size:13px;margin-top:10px}
+  .legend .req{color:var(--req)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Заглядываем в готовый MCP-сервер</h1>
+  <p class="sub">Эта страница — <b>MCP-клиент</b>. Он подключается к чужому, уже работающему
+    серверу и показывает его инструменты — то самое <b>«меню»</b>, которое читает ИИ,
+    прежде чем что-то сделать. Свой сервер мы не пишем, только дёргаем существующий.</p>
+
+  <div class="bar">
+    <label class="lbl" for="srv">Готовый сервер:</label>
+    <select id="srv">
+      <option value="deepwiki">DeepWiki</option>
+      <option value="mslearn">Microsoft Learn</option>
+    </select>
+    <button id="go">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H6a3 3 0 0 0 0 6h3"/><path d="M15 7h3a3 3 0 0 1 0 6h-3"/><path d="M8 10h8"/></svg>
+      Подключиться
+    </button>
+    <span class="url" id="url"></span>
+  </div>
+
+  <div class="card" id="stepsCard" style="display:none">
+    <h2>Что происходит под капотом</h2>
+    <div class="step" data-i="0"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#39d0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="txt">Открываю соединение по сети (Streamable HTTP)</span><span class="ms"></span></div>
+    <div class="step" data-i="1"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#39d0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="txt">Рукопожатие (initialize) — без него сервер молчит</span><span class="ms"></span></div>
+    <div class="step" data-i="2"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#39d0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="txt">Запрашиваю список инструментов (tools/list)</span><span class="ms"></span></div>
+  </div>
+
+  <div class="srv" id="srvLine">
+    <span class="name" id="srvName"></span>
+    <span class="ver" id="srvVer"></span>
+    <span class="pill" id="srvCount"></span>
+  </div>
+
+  <div id="toolsWrap" style="display:none">
+    <p class="menuhint">Меню сервера — вот что вернул <b>tools/list</b>. Нажми на инструмент, чтобы развернуть его схему.</p>
+    <div class="tools" id="tools"></div>
+    <p class="legend">Параметр со звёздочкой <span class="req">*</span> — обязательный (это и есть «схема»: что нужно сообщить инструменту).</p>
+  </div>
+
+  <details class="hood" id="hood" style="display:none">
+    <summary>Совсем сырьё: <b>JSON-RPC</b> запрос и ответ на проводе</summary>
+    <p class="lab">Запрос, который клиент шлёт серверу:</p>
+    <pre id="rawReq"></pre>
+    <p class="lab">Ответ сервера (список инструментов как есть):</p>
+    <pre id="rawResp"></pre>
+  </details>
+
+  <div class="err" id="err"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const go = $("#go"), srv = $("#srv");
+
+const SERVER_URL = {deepwiki:"https://mcp.deepwiki.com/mcp", mslearn:"https://learn.microsoft.com/api/mcp"};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function reset(){
+  $("#stepsCard").style.display="none";
+  $("#srvLine").classList.remove("show");
+  $("#toolsWrap").style.display="none";
+  $("#hood").style.display="none";
+  $("#err").classList.remove("show");
+  $("#tools").innerHTML="";
+  document.querySelectorAll(".step").forEach(s=>{s.classList.remove("on");s.querySelector(".ms").textContent="";});
+}
+
+srv.addEventListener("change", ()=>{ reset(); $("#url").textContent=SERVER_URL[srv.value]; });
+$("#url").textContent = SERVER_URL[srv.value];
+
+go.addEventListener("click", async ()=>{
+  reset();
+  go.disabled = true;
+  $("#stepsCard").style.display="block";
+  try{
+    const r = await fetch("/api/tools?server="+srv.value);
+    const data = await r.json();
+    if(!r.ok || data.error){ throw new Error(data.error || ("HTTP "+r.status)); }
+
+    // показываем шаги по очереди с их реальными замерами
+    const steps = document.querySelectorAll(".step");
+    for(let i=0;i<steps.length;i++){
+      await sleep(420);
+      steps[i].classList.add("on");
+      const ms = data.steps[i] ? data.steps[i].ms : "";
+      steps[i].querySelector(".ms").textContent = ms!=="" ? ms+" мс" : "";
+    }
+    await sleep(300);
+
+    // строка сервера
+    $("#srvName").textContent = data.server.label;
+    $("#srvVer").textContent = data.server.name + " " + data.server.version;
+    $("#srvCount").textContent = "инструментов: " + data.tools.length;
+    $("#srvLine").classList.add("show");
+
+    // карточки инструментов
+    const box = $("#tools");
+    data.tools.forEach(t=>{
+      const props = (t.inputSchema && t.inputSchema.properties) || {};
+      const req = new Set((t.inputSchema && t.inputSchema.required) || []);
+      const chips = Object.keys(props).map(p =>
+        `<span class="param ${req.has(p)?'req':''}">${p}${req.has(p)?' *':''}</span>`).join("");
+      const el = document.createElement("div");
+      el.className = "tool";
+      el.innerHTML =
+        `<div class="top"><span class="nm">${t.name}</span>
+           <svg class="chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+         <p class="desc">${t.description||""}</p>
+         ${chips?`<div class="params">${chips}</div>`:""}
+         <div class="raw"><p class="lab" style="color:#9aa3b2;font-size:13px;margin:0 0 6px">Схема параметров (inputSchema):</p>
+           <pre>${escapeHtml(JSON.stringify(t.inputSchema,null,2))}</pre></div>`;
+      el.addEventListener("click", ()=> el.classList.toggle("open"));
+      box.appendChild(el);
+    });
+    $("#toolsWrap").style.display="block";
+
+    // сырьё
+    $("#rawReq").textContent = JSON.stringify(data.request,null,2);
+    $("#rawResp").textContent = JSON.stringify(data.tools,null,2);
+    $("#hood").style.display="block";
+
+  }catch(e){
+    const box = $("#err");
+    box.textContent = "Сервер не ответил: " + e.message + ". Попробуй выбрать другой сервер в списке выше.";
+    box.classList.add("show");
+  }finally{
+    go.disabled = false;
+  }
+});
+
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+</script>
+</body>
+</html>
