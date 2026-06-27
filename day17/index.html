@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 17 — агент заказывает в нашем MCP-ресторане</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1e222e; --line:#2a2f3d;
+    --txt:#e7e9ee; --mut:#9aa3b2; --accent:#7c83ff; --accent2:#39d0a8;
+    --warn:#ffb86b; --danger:#ff7a90; --req:#ffcf6b;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#1b2030 0,var(--bg) 55%);
+    color:var(--txt);font:16px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 20px 80px}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px}
+  .sub{color:var(--mut);margin:0 0 22px;max-width:680px}
+  .sub b{color:var(--txt);font-weight:600}
+
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  input[type=text]{flex:1;min-width:240px;background:var(--panel2);color:var(--txt);
+    border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:15px;outline:none}
+  input[type=text]:focus{border-color:var(--accent)}
+  button{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:11px 18px;font-size:15px;font-weight:600;transition:.15s}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.5;cursor:default}
+  button.ok{background:var(--accent2);color:#06231b}
+  button.no{background:transparent;color:var(--danger);border:1px solid #5a2630}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+  .chip{cursor:pointer;background:var(--panel2);border:1px solid var(--line);border-radius:20px;
+    padding:7px 13px;font-size:13px;color:var(--mut);transition:.15s}
+  .chip:hover{border-color:var(--accent);color:var(--txt)}
+
+  /* ЛЕНТА ШАГОВ (timeline) */
+  #flow{margin-top:22px}
+  .step{display:flex;gap:16px;opacity:0;transform:translateY(8px);transition:opacity .4s ease,transform .4s ease}
+  .step.show{opacity:1;transform:none}
+  .rail{display:flex;flex-direction:column;align-items:center;flex:0 0 auto}
+  .bullet{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--panel);
+    display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--mono);color:var(--mut);transition:.3s}
+  .step.active .bullet{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px rgba(124,131,255,.12)}
+  .step.done .bullet{border-color:var(--accent2);background:rgba(57,208,168,.14);color:var(--accent2)}
+  .line{width:2px;flex:1;background:var(--line);margin:4px 0;min-height:14px;transition:.3s}
+  .step.done .line{background:linear-gradient(var(--accent2),var(--line))}
+  .step:last-child .line{display:none}
+  .body{flex:1;padding-bottom:20px;min-width:0}
+  .stitle{font-weight:600;font-size:16px;margin:3px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .term{font:12px/1 var(--mono);color:var(--accent);background:rgba(124,131,255,.10);
+    border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+  .hint{color:var(--mut);font-size:13px;margin:0 0 8px}
+  .scontent{margin-top:10px}
+
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
+    border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* меню-блюда */
+  .tool{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px;cursor:pointer}
+  .tool:hover{border-color:var(--accent)}
+  .tool.picked{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(57,208,168,.10)}
+  .tool .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .tool .nm{font:600 15px/1.2 var(--mono);color:#cdd2ff}
+  .badge{font-size:11px;font-weight:700;border-radius:6px;padding:3px 7px}
+  .badge.read{background:rgba(57,208,168,.14);color:var(--accent2)}
+  .badge.write{background:rgba(255,184,107,.14);color:var(--warn)}
+  .pickmark{margin-left:auto;font-size:12px;color:var(--accent2);font-weight:700}
+  .tool .chev{margin-left:auto;color:var(--mut);transition:.2s}
+  .tool.picked .chev{margin-left:8px}
+  .tool.open .chev{transform:rotate(90deg)}
+  .tool .desc{color:var(--mut);font-size:14px;margin:8px 0 0}
+  .params{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .param{font:13px/1 var(--mono);background:#11141d;border:1px solid var(--line);border-radius:7px;padding:5px 9px;color:#c7ccd6}
+  .param.req{border-color:var(--req);color:var(--req)}
+  .raw{display:none;margin-top:12px}
+  .tool.open .raw{display:block}
+  pre{margin:0;background:#0b0d13;border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;overflow:auto;font:13px/1.5 var(--mono);color:#aeb6c4}
+  .lab{color:var(--mut);font-size:13px;margin:8px 0 6px}
+
+  .order{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .order .nm{font:600 15px/1.3 var(--mono);color:#cdd2ff}
+
+  .gate{border-radius:12px;padding:14px 16px;border:1px solid var(--line);background:var(--panel2)}
+  .gate.write{border-color:#5a4326;background:rgba(255,184,107,.06)}
+  .gate p{margin:0 0 12px;color:var(--mut);font-size:14px}
+  .gate .gt{font-weight:600;color:var(--txt);margin:0 0 4px}
+  .gate .gt.w{color:var(--warn)}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  .verdict{font-weight:600;font-size:14px;margin-top:10px}
+  .verdict.ok{color:var(--accent2)} .verdict.no{color:var(--danger)}
+
+  .answer{background:linear-gradient(90deg,rgba(124,131,255,.10),transparent);
+    border:1px solid var(--line);border-radius:12px;padding:14px 16px;white-space:pre-wrap;line-height:1.55}
+  .err{display:none;margin-top:16px;background:rgba(255,90,90,.08);
+    border:1px solid #5a2630;border-radius:12px;padding:14px 18px;color:#ffb4b4}
+  .err.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Агент заказывает в нашем MCP-ресторане</h1>
+  <p class="sub">Эта страница — <b>агент</b> (посетитель). Он заходит на наш <b>сервер</b> (ресторан),
+    берёт <b>меню</b> инструментов, модель сама выбирает блюдо, а на блюдо, которое <b>меняет данные</b>,
+    официант спрашивает тебя. Каждый шаг появляется по очереди — смотри, как одно вытекает из другого.</p>
+
+  <div class="bar">
+    <input type="text" id="q" placeholder="Например: покажи активных клиентов" autocomplete="off">
+    <button id="go"><span id="goLbl">Спросить агента</span></button>
+  </div>
+  <div class="chips">
+    <span class="chip" data-q="Покажи всех активных клиентов">Показать активных</span>
+    <span class="chip" data-q="Найди клиентов по теме НДС">Поиск: НДС</span>
+    <span class="chip" data-q="Заведи нового клиента: Петров Сергей, стадия lead, заметка «звонок с сайта»">Создать клиента</span>
+  </div>
+
+  <div id="flow"></div>
+  <div class="err" id="err"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const go = $("#go"), q = $("#q"), flow = $("#flow");
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const esc = s => String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+let state=null, stepN=0;
+
+document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{q.value=c.dataset.q; ask();}));
+q.addEventListener("keydown",e=>{ if(e.key==="Enter") ask(); });
+go.addEventListener("click", ask);
+function busy(on){ go.disabled=on; $("#goLbl").innerHTML = on ? '<span class="spin"></span>' : "Спросить агента"; }
+
+// добавить новый шаг в ленту (active, со спиннером); вернуть его узлы
+function addStep(title, term){
+  stepN++;
+  const el = document.createElement("div");
+  el.className = "step active";
+  el.innerHTML =
+    `<div class="rail"><div class="bullet"><span class="spin"></span></div><div class="line"></div></div>
+     <div class="body">
+       <div class="stitle">${esc(title)} ${term?`<span class="term">${esc(term)}</span>`:""}</div>
+       <div class="scontent"></div>
+     </div>`;
+  flow.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add("show"));
+  el.scrollIntoView({behavior:"smooth",block:"end"});
+  return {el, content: el.querySelector(".scontent"), bullet: el.querySelector(".bullet")};
+}
+// пометить шаг выполненным: номер + галочка
+function doneStep(s, n){
+  s.el.classList.remove("active"); s.el.classList.add("done");
+  s.bullet.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#39d0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+}
+
+function reset(){ flow.innerHTML=""; $("#err").classList.remove("show"); stepN=0; }
+function fail(m){ $("#err").textContent="Ошибка: "+m; $("#err").classList.add("show"); }
+
+async function ask(){
+  const message = q.value.trim();
+  if(!message) return;
+  reset(); busy(true);
+
+  // Шаг 1 — захожу и спрашиваю модель (пока крутится — реальный запрос к серверу+модели)
+  const s1 = addStep("Захожу в ресторан и зову модель", "initialize");
+  let data;
+  try{
+    const r = await fetch("/api/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+    data = await r.json();
+    if(!r.ok || data.error) throw new Error(data.error || ("HTTP "+r.status));
+  }catch(e){ fail(e.message); busy(false); return; }
+  state = {message, decision:data.decision};
+  s1.content.innerHTML = `<p class="hint">Подключился к серверу <b>${esc(data.server.name)}</b>, рукопожатие прошло.</p>`;
+  doneStep(s1); await sleep(550);
+
+  // Шаг 2 — беру меню (tools/list)
+  const s2 = addStep("Беру меню — что умеет ресторан", "tools/list");
+  await sleep(450);
+  s2.content.innerHTML = `<p class="hint">Сервер прислал список блюд (инструментов). Раскрой блюдо — увидишь, что в нём нужно указать (это schema).</p>` + menuHtml(data.tools, data.decision);
+  wireTools(s2.content);
+  doneStep(s2); await sleep(650);
+
+  // Шаг 3 — модель выбрала блюдо (или ответила без инструмента)
+  const s3 = addStep("Модель выбирает блюдо", "её решение");
+  await sleep(450);
+  if(data.decision.kind === "final"){
+    s3.content.innerHTML = `<p class="hint">Для этого вопроса инструмент не нужен — модель отвечает сама.</p>`;
+    doneStep(s3); await sleep(450);
+    const sf = addStep("Ответ агента"); sf.content.innerHTML = `<div class="answer">${esc(data.decision.text)}</div>`; doneStep(sf);
+    busy(false); return;
+  }
+  const d = data.decision;
+  s3.content.innerHTML =
+    `<div class="order"><div class="top"><span class="nm">${esc(d.name)}</span>
+       ${d.writes?'<span class="badge write">меняет данные</span>':'<span class="badge read">только смотрит</span>'}</div>
+       <p class="lab">Уточнения к заказу, которые модель составила из твоих слов:</p>
+       <pre>${esc(JSON.stringify(d.args,null,2))}</pre></div>`;
+  doneStep(s3); await sleep(650);
+
+  // Шаг 4 — официант: проверка (read несём сразу, write спрашиваем)
+  const s4 = addStep("Официант проверяет заказ", "человек-в-цикле");
+  await sleep(450);
+  if(d.writes){
+    s4.content.innerHTML =
+      `<div class="gate write"><p class="gt w">Это блюдо меняет данные</p>
+        <p>Запись в базу, повтор создаст дубль. Поэтому официант не несёт сам, а спрашивает тебя.</p>
+        <div class="btns"><button class="ok" id="bOk">Подтвердить</button><button class="no" id="bNo">Отклонить</button></div></div>`;
+    $("#bOk").addEventListener("click",()=>execute(true,s4));
+    $("#bNo").addEventListener("click",()=>execute(false,s4));
+    busy(false); // ждём человека
+  }else{
+    s4.content.innerHTML = `<div class="gate"><p class="gt">Блюдо только смотрит</p>
+        <p>Ничего не меняется — официант несёт без лишних вопросов.</p></div>`;
+    doneStep(s4); await sleep(550);
+    execute(true, null);   // read: решение человека не нужно, не дописываем «ты подтвердил»
+  }
+}
+
+async function execute(approved, s4){
+  const d = state.decision;
+  if(s4){
+    s4.el.querySelectorAll("button").forEach(b=>b.disabled=true);
+    s4.content.insertAdjacentHTML("beforeend",
+      `<p class="verdict ${approved?'ok':'no'}">${approved?'Ты подтвердил — несём на кухню.':'Ты отклонил — заказ отменён.'}</p>`);
+    if(!s4.el.classList.contains("done")) doneStep(s4);
+  }
+  await sleep(500);
+  busy(true);
+  let data;
+  try{
+    const r = await fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:state.message, name:d.name, args:d.args, approved})});
+    data = await r.json();
+    if(!r.ok || data.error) throw new Error(data.error || ("HTTP "+r.status));
+  }catch(e){ fail(e.message); busy(false); return; }
+
+  if(approved){
+    // Шаг 5 — заказ на кухню (tools/call)
+    const s5 = addStep("Несу заказ на кухню", "tools/call");
+    await sleep(450);
+    s5.content.innerHTML = `<p class="hint">Вот сам заказ на проводе — формат JSON-RPC поверх Streamable HTTP:</p>
+      <pre>${esc(JSON.stringify(d.jsonrpc,null,2))}</pre>`;
+    doneStep(s5); await sleep(650);
+
+    // Шаг 6 — тарелка (результат)
+    const s6 = addStep("Кухня прислала тарелку", "результат");
+    await sleep(450);
+    s6.content.innerHTML = data.result_structured!=null
+      ? `<p class="hint">Готовый результат машиночитаемой структурой (structuredContent):</p><pre>${esc(JSON.stringify(data.result_structured,null,2))}</pre>`
+      : `<p class="hint">Результат вернулся.</p>`;
+    doneStep(s6); await sleep(650);
+  }
+
+  // Шаг 7 — ответ агента
+  const s7 = addStep("Агент отвечает тебе");
+  await sleep(400);
+  s7.content.innerHTML = `<div class="answer">${esc(data.answer)}</div>`;
+  doneStep(s7);
+  busy(false);
+}
+
+function menuHtml(tools, decision){
+  const chosen = decision.kind==="tool" ? decision.name : null;
+  return tools.map(t=>{
+    const props=(t.inputSchema&&t.inputSchema.properties)||{};
+    const req=new Set((t.inputSchema&&t.inputSchema.required)||[]);
+    const chips=Object.keys(props).map(p=>`<span class="param ${req.has(p)?'req':''}">${p}${req.has(p)?' *':''}</span>`).join("");
+    const badge=t.readOnly?`<span class="badge read">только смотрит</span>`:`<span class="badge write">меняет данные</span>`;
+    const pick=t.name===chosen?`<span class="pickmark">← выбрала модель</span>`:"";
+    return `<div class="tool ${t.name===chosen?'picked':''}">
+      <div class="top"><span class="nm">${esc(t.name)}</span>${badge}${pick}
+        <svg class="chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+      <p class="desc">${esc(t.description||"")}</p>
+      ${chips?`<div class="params">${chips}</div>`:""}
+      <div class="raw"><p class="lab">Что нужно указать при заказе (schema):</p><pre>${esc(JSON.stringify(t.inputSchema,null,2))}</pre></div>
+    </div>`;
+  }).join("");
+}
+function wireTools(root){ root.querySelectorAll(".tool").forEach(el=>el.addEventListener("click",()=>el.classList.toggle("open"))); }
+</script>
+</body>
+</html>
