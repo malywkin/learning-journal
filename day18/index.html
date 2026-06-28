@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 18 — повар с будильником в нашем MCP-ресторане</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1e222e; --line:#2a2f3d;
+    --txt:#e7e9ee; --mut:#9aa3b2; --accent:#7c83ff; --accent2:#39d0a8;
+    --warn:#ffb86b; --danger:#ff7a90; --req:#ffcf6b;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#1b2030 0,var(--bg) 55%);
+    color:var(--txt);font:16px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 20px 80px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px}
+  .sub{color:var(--mut);margin:0 0 22px;max-width:720px}
+  .sub b{color:var(--txt);font-weight:600}
+
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .bar .lab{color:var(--mut);font-size:13px}
+  input[type=text]{background:var(--panel2);color:var(--txt);
+    border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:15px;outline:none}
+  input.sub{width:170px} input.num{width:54px;text-align:center}
+  input[type=text]:focus{border-color:var(--accent)}
+  button{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:10px 15px;font-size:14px;font-weight:600;transition:.15s}
+  button:hover{filter:brightness(1.08)}
+  button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line);font-weight:500}
+  button.ghost:hover{border-color:var(--accent)}
+  button.mini{padding:5px 10px;font-size:12px;font-weight:500;background:transparent;
+    color:var(--danger);border:1px solid #5a2630}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .grp{display:flex;gap:7px;align-items:center;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:7px 9px}
+
+  .cols{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-top:22px}
+  @media(max-width:780px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);
+    margin:0 0 12px;font-weight:700}
+  .counters{display:flex;gap:22px;margin-bottom:14px}
+  .counters .n{font:600 24px/1 var(--mono);color:var(--txt)}
+  .counters .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+
+  /* карточки расписания (как «блюда» Дня 17) */
+  .job{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-top:8px}
+  .job:first-of-type{margin-top:0}
+  .job .top{display:flex;align-items:center;gap:8px}
+  .job .nm{font:600 13px/1.2 var(--mono);color:#cdd2ff;overflow:hidden;text-overflow:ellipsis}
+  .term{font:11px/1 var(--mono);color:var(--accent);background:rgba(124,131,255,.10);
+    border:1px solid var(--line);border-radius:6px;padding:3px 6px;white-space:nowrap}
+  .term.read{color:var(--accent2);background:rgba(57,208,168,.12)}
+  .term.warn{color:var(--warn);background:rgba(255,184,107,.12)}
+  .job .next{color:var(--mut);font-size:12px;margin-top:7px}
+  .job .x{margin-top:8px}
+  .empty{color:var(--mut);font-size:13.5px;font-style:italic}
+
+  /* ЛЕНТА РАБОТЫ — каждый тик это блок с пошаговой анимацией (язык Дня 17) */
+  #feed .tick{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:14px;opacity:0;transform:translateY(8px);
+    transition:opacity .4s,transform .4s}
+  #feed .tick.show{opacity:1;transform:none}
+  .tick .head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .tick .htime{font:12px/1 var(--mono);color:var(--mut)}
+  .tick .hkind{font-weight:600;font-size:15px}
+  .tick.collect .hkind{color:var(--accent2)} .tick.digest .hkind{color:var(--accent)}
+  .tick.reminder .hkind{color:var(--warn)}
+  .step{display:flex;gap:13px;opacity:.0;transform:translateY(4px);transition:opacity .35s,transform .35s}
+  .step.show{opacity:1;transform:none}
+  .rail{display:flex;flex-direction:column;align-items:center;flex:0 0 auto}
+  .bullet{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:var(--panel2);
+    display:flex;align-items:center;justify-content:center;font:600 11px/1 var(--mono);color:var(--mut);transition:.3s}
+  .step.active .bullet{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px rgba(124,131,255,.10)}
+  .step.done .bullet{border-color:var(--accent2);background:rgba(57,208,168,.14);color:var(--accent2)}
+  .line{width:2px;flex:1;background:var(--line);margin:3px 0;min-height:10px}
+  .step.done .line{background:linear-gradient(var(--accent2),var(--line))}
+  .step:last-child .line{display:none}
+  .sbody{flex:1;padding-bottom:12px;min-width:0}
+  .stitle{font-size:14.5px;margin:1px 0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .sval{color:var(--mut);font-size:13px}
+  .sval b{color:var(--txt)}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.25);
+    border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .digest{margin-top:18px}
+  .digest .meta{font:12px/1 var(--mono);color:var(--mut);margin-bottom:8px}
+  .digest .body{background:linear-gradient(90deg,rgba(124,131,255,.10),transparent);
+    border:1px solid var(--line);border-radius:12px;padding:14px 16px;white-space:pre-line;line-height:1.55}
+
+  .under{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 18px;color:var(--mut);font-size:14px}
+  .under b{color:var(--txt)} .under code{font:13px/1 var(--mono);background:#0b0d13;
+    border:1px solid var(--line);border-radius:6px;padding:2px 6px;color:#c7ccd6}
+  .pending{color:var(--mut);font-size:13px;margin-top:10px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Повар с будильником в нашем MCP-ресторане</h1>
+  <p class="sub">День 17 — <b>официант</b>: отвечал, только когда к нему обратятся. Сегодня рядом, в том
+     же процессе, встал <b>повар с будильником</b>: он сам по часам ходит в Reddit за свежими постами и
+     сворачивает их в сводку. Каждое его срабатывание — <b>цепочка шагов, загорается по очереди</b>,
+     как заказ в Дне 17. Сервер тебе ничего не шлёт — ты сам <b>забираешь</b> готовое (pull).</p>
+
+  <div class="bar">
+    <span class="lab">раздел&nbsp;r/</span>
+    <input type="text" class="sub" id="sub" value="LocalLLaMA">
+    <button onclick="act('run_now',{subreddit:sub(),kind:'collect'},'собираю посты…')">Собрать сейчас</button>
+    <button onclick="act('run_now',{subreddit:sub(),kind:'digest'},'делаю сводку…')">Сводку сейчас</button>
+  </div>
+  <div class="row">
+    <div class="grp"><span class="lab">сбор каждые</span><input type="text" class="num" id="cmin" value="1"><span class="lab">мин</span>
+      <button class="ghost" onclick="act('schedule_collection',{subreddit:sub(),every_minutes:+cmin.value},'ставлю сбор на будильник…')">на будильник</button></div>
+    <div class="grp"><span class="lab">сводка каждые</span><input type="text" class="num" id="dmin" value="3"><span class="lab">мин</span>
+      <button class="ghost" onclick="act('schedule_digest',{subreddit:sub(),every_minutes:+dmin.value},'ставлю сводку на будильник…')">на будильник</button></div>
+    <div class="grp"><span class="lab">через</span><input type="text" class="num" id="rmin" value="1"><span class="lab">мин один раз</span>
+      <button class="ghost" onclick="act('schedule_once',{subreddit:sub(),in_minutes:+rmin.value},'ставлю разовое дело…')">собрать+свернуть</button></div>
+  </div>
+  <div class="pending" id="pending"></div>
+
+  <div class="cols">
+    <div class="card">
+      <h2>На будильнике</h2>
+      <div class="counters">
+        <div><div class="n" id="cPosts">0</div><div class="l">постов</div></div>
+        <div><div class="n" id="cDigests">0</div><div class="l">сводок</div></div>
+      </div>
+      <div id="jobs"><div class="empty">Будильник пока пуст. Поставь сбор по расписанию.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Что делает повар · по шагам</h2>
+      <div id="feed"><div class="empty">Нажми «Собрать сейчас» или заведи сбор на будильник — и тут вживую загорятся шаги.</div></div>
+    </div>
+  </div>
+
+  <div class="card digest">
+    <h2>Последняя сводка «что нового»</h2>
+    <div id="digest"><div class="empty">Сводки ещё нет.</div></div>
+  </div>
+
+  <div class="under">
+    <b>Под капотом.</b> Расписание лежит на диске — закрой <code>run.py</code> и подними снова, задачи
+    вернутся, повар продолжит. Вот это «24/7»: не магия MCP, а живой процесс плюс расписание на диске.
+    В Reddit повар ходит в стороне (в отдельном потоке), чтобы не заморозить официанта — фоновая работа
+    не должна вешать то, что отвечает на запросы.
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const sub = () => $("#sub").value.trim() || "LocalLLaMA";
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const esc = s => String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmtTime = ts => new Date(ts*1000).toLocaleTimeString("ru-RU");
+
+const seen = new Set();   // ключи уже показанных тиков
+let primed = false;       // первый опрос — историю показываем без анимации
+let animating = false, queue = [];
+
+async function act(tool, args, pendMsg){
+  $("#pending").textContent = pendMsg || "";
+  try{
+    await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({tool,args})});
+  }catch(e){}
+  pollJobs(); pollStatus();
+  setTimeout(()=>{ if($("#pending").textContent===pendMsg) $("#pending").textContent=""; }, 2500);
+}
+
+// канонические шаги под каждый тип тика; в последний шаг кладём распарсенный итог
+function stepsFor(kind, detail){
+  const num = (detail.match(/-?\d+/)||[])[0];
+  if(kind==="collect") return [
+    ["Будильник звякнул","interval"],
+    ["Иду в Reddit за свежими постами","arctic · tools/call"],
+    ["Дозаписал только новые (без дублей)","SQLite"],
+    [detail,""],
+  ];
+  if(kind==="digest") return [
+    ["Время сводки","по расписанию"],
+    ["Беру накопленные посты","SQLite"],
+    ["LLM сворачивает в дайджест","gpt-oss · temp 0"],
+    [detail,""],
+  ];
+  return [["Сработало отложенное событие","date"], [detail,""]];
+}
+
+function termClass(t){ if(/SQLite|interval/.test(t)) return "read"; if(/date/.test(t)) return "warn"; return ""; }
+
+async function renderTick(run, animate){
+  const tick = document.createElement("div");
+  tick.className = "tick "+run.kind;
+  tick.innerHTML = `<div class="head"><span class="htime">${fmtTime(run.ts)}</span>
+    <span class="hkind">${run.kind==="collect"?"Сбор постов":run.kind==="digest"?"Сводка":"Напоминание"}</span></div>`;
+  const feedEl = $("#feed");
+  if(feedEl.querySelector(".empty")) feedEl.innerHTML="";
+  feedEl.prepend(tick);
+  requestAnimationFrame(()=>tick.classList.add("show"));
+
+  const steps = stepsFor(run.kind, run.detail);
+  for(let i=0;i<steps.length;i++){
+    const [title,term] = steps[i];
+    const el = document.createElement("div");
+    el.className = "step"+(animate?" active":" done show");
+    el.innerHTML = `<div class="rail"><div class="bullet">${animate?'<span class="spin"></span>':checkSvg()}</div><div class="line"></div></div>
+      <div class="sbody"><div class="stitle">${esc(title)} ${term?`<span class="term ${termClass(term)}">${esc(term)}</span>`:""}</div></div>`;
+    tick.appendChild(el);
+    if(animate){
+      requestAnimationFrame(()=>el.classList.add("show"));
+      await sleep(420);
+      el.classList.remove("active"); el.classList.add("done");
+      el.querySelector(".bullet").innerHTML = checkSvg();
+    }
+  }
+}
+function checkSvg(){ return `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#39d0a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`; }
+
+async function drainQueue(){
+  if(animating) return; animating=true;
+  while(queue.length){ await renderTick(queue.shift(), true); await sleep(220); }
+  animating=false;
+}
+
+async function pollStatus(){
+  try{
+    const r = await fetch("/api/status?subreddit="+encodeURIComponent(sub()));
+    const s = await r.json();
+    $("#cPosts").textContent = s.posts||0;
+    $("#cDigests").textContent = s.digests||0;
+
+    // новые тики (в recent_runs новые сверху) → показать старые→новые
+    const fresh = [];
+    for(const run of (s.recent_runs||[])){
+      const key = run.ts+"|"+run.detail;
+      if(!seen.has(key)){ seen.add(key); fresh.push(run); }
+    }
+    fresh.reverse();
+    if(!primed){ // первый опрос: история без анимации
+      for(const run of fresh) renderTick(run, false);
+      primed = true;
+    }else{
+      queue.push(...fresh); drainQueue();
+    }
+
+    const d = s.latest_digest, dbox=$("#digest");
+    if(d && d.summary){
+      dbox.innerHTML = `<div class="meta">r/${esc(d.subreddit)} · по ${d.n_posts} постам · ${fmtTime(d.created_at)}</div>
+        <div class="body">${esc(d.summary)}</div>`;
+    }
+  }catch(e){}
+}
+
+async function pollJobs(){
+  try{
+    const r = await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({tool:"list_jobs",args:{}})});
+    const jobs = ((await r.json()).jobs)||[];
+    const box = $("#jobs");
+    if(!jobs.length){ box.innerHTML='<div class="empty">Будильник пока пуст. Поставь сбор по расписанию.</div>'; return; }
+    box.innerHTML = jobs.map(j=>{
+      const kind = j.id.startsWith("collect")?["сбор","read"]:j.id.startsWith("digest")?["сводка",""]:["разовое","warn"];
+      const trig = j.trigger.replace(/^(interval|cron|date)\[?/,"$1 ").replace(/\]$/,"");
+      const nxt = j.next_run ? "след: "+j.next_run : "разовая";
+      return `<div class="job"><div class="top"><span class="term ${kind[1]}">${kind[0]}</span>
+        <span class="nm">${esc(j.id)}</span></div>
+        <div class="next">${esc(trig)} · ${nxt}</div>
+        <div class="x"><button class="mini" onclick="act('cancel_job',{job_id:'${j.id}'})">снять</button></div></div>`;
+    }).join("");
+  }catch(e){}
+}
+
+pollJobs(); pollStatus();
+setInterval(pollStatus, 2000);
+setInterval(pollJobs, 4000);
+</script>
+</body>
+</html>

@@ -41,6 +41,13 @@ invariants_user.json
 # День 17 — локальная база CRM (данные прогона, пересоздаётся из crm.init_db(), не код)
 crm.db
 *.db
+# Спутники SQLite в режиме WAL (день 18: day18.db-wal/-shm, jobstore) — данные, не код
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
 
 # Временные пробники/раннеры (живут локально, в репозиторий не идут):
 # _*.py — черновые скрипты (_run, _exp, _smoke), probe/ping — разовые зонды API
