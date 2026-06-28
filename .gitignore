@@ -41,6 +41,9 @@ invariants_user.json
 # День 17 — локальная база CRM (данные прогона, пересоздаётся из crm.init_db(), не код)
 crm.db
 *.db
+
+# День 19 — сохранённые дайджесты (артефакты прогона save_to_file, папка создаётся сама)
+day19/output/
 # Спутники SQLite в режиме WAL (день 18: day18.db-wal/-shm, jobstore) — данные, не код
 *.db-wal
 *.db-shm
