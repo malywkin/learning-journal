@@ -1,0 +1,10 @@
+# День 21 — индексация документов для RAG
+sentence-transformers      # эмбеддинги (модель BAAI/bge-m3, локально)
+sqlite-vec                 # векторный индекс поверх SQLite
+langchain-text-splitters   # стратегии нарезки (recursive / markdown-headers)
+fastapi                    # веб-витрина сдачи
+uvicorn                    # запуск веб-сервера
+
+# Смотровые окна (опционально, для наглядности — не нужны для самого пайплайна):
+# embedding-atlas          # карта векторов в браузере
+# datasette                # табличный просмотр индекса

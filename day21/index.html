@@ -1,0 +1,119 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>День 21 · Индексация документов</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;
+padding:28px;max-width:1080px;margin:0 auto}
+h1{font-size:23px;font-weight:600}
+.lead{color:#8b949e;margin:4px 0 26px;font-size:14px}
+h2{font-size:17px;margin:30px 0 4px}
+.hint{color:#8b949e;font-size:13px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:760px){.grid3{grid-template-columns:1fr}}
+.tile{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px}
+.tile .cap{color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.tile .big{font-size:26px;font-weight:600;color:#58a6ff;margin:6px 0}
+.tile .ok{color:#3fb950;font-size:12px;font-weight:600}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#8b949e;
+word-break:break-all}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8px;
+padding:9px 16px;font-size:14px;cursor:pointer;transition:.15s}
+button:hover{background:#30363d}
+button.on{background:#1f6feb;border-color:#388bfd}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+.col h3{font-size:14px;margin-bottom:8px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:9px;padding:11px 13px;margin-bottom:9px;
+opacity:0;transform:translateY(6px);animation:in .35s forwards}
+@keyframes in{to{opacity:1;transform:none}}
+.card .m{display:flex;justify-content:space-between;color:#8b949e;font-size:12px;margin-bottom:5px}
+.card .t{font-size:13px;color:#c9d1d9}
+.a .card{border-left:3px solid #d29922}
+.b .card{border-left:3px solid #3fb950}
+.sec{color:#3fb950;font-weight:600;font-size:12px}
+.searchbar{display:flex;gap:8px;margin-bottom:14px}
+.searchbar input{flex:1;background:#0b0f14;border:1px solid #30363d;border-radius:8px;
+padding:11px 13px;color:#e6edf3;font-size:15px}
+.res{background:#161b22;border:1px solid #30363d;border-radius:9px;padding:12px 14px;margin-bottom:10px;
+border-left:3px solid #58a6ff;opacity:0;animation:in .35s forwards}
+.res .h{display:flex;justify-content:space-between;margin-bottom:6px}
+.res .cos{color:#58a6ff;font-weight:600}
+.chip{background:#21262d;border-radius:5px;padding:1px 8px;font-size:11px;color:#c9d1d9}
+.loading{color:#8b949e;font-size:13px}
+</style></head><body>
+
+<h1>День 21 — Индексация документов</h1>
+<div class="lead">Корпус: «Precious Little Sleep» (Alexis Dubief), главы 1–3. Локальный RAG-индекс: нарезка → эмбеддинги bge-m3 → база sqlite-vec с метаданными.</div>
+
+<h2>Результат задания</h2>
+<div class="hint">Три требования учителя: локальный индекс с эмбеддингами · метаданные · сравнение двух стратегий нарезки.</div>
+<div class="grid3" id="tiles"><div class="loading">Загружаю индекс…</div></div>
+
+<h2>1 · Нарезка книги двумя способами</h2>
+<div class="hint">Один и тот же раздел «Sleep Safety», порезанный по-разному. Нажми, чтобы посмотреть карточки каждой стратегии.</div>
+<div class="tabs">
+<button id="tab-fixed" class="on" onclick="showSlice('fixed')">Слепо по размеру</button>
+<button id="tab-struct" onclick="showSlice('structural')">Структурно по заголовкам</button>
+<button onclick="showSlice('both')">Показать рядом</button>
+</div>
+<div id="slice"><div class="loading">…</div></div>
+
+<h2>2 · Живой поиск по книге</h2>
+<div class="hint">Спроси книгу своими словами — можно по-русски, книга английская. Индекс найдёт куски, близкие по смыслу.</div>
+<div class="searchbar">
+<input id="q" placeholder="например: в какой позе укладывать младенца спать"
+ onkeydown="if(event.key==='Enter')doSearch()">
+<button onclick="doSearch()">Найти</button>
+</div>
+<div id="results"></div>
+
+<script>
+const esc=s=>{const d=document.createElement('div');d.textContent=s;return d.innerHTML};
+let SLICE=null;
+
+async function loadSummary(){
+ const s=await (await fetch('/api/summary')).json();
+ document.getElementById('tiles').innerHTML=`
+  <div class="tile"><div class="cap">Локальный индекс + эмбеддинги</div>
+   <div class="big">${s.total}</div><div>чанков в базе · <span class="ok">готово</span></div>
+   <div class="mono" style="margin-top:8px">bge-m3, ${s.dim} чисел/чанк<br>вектор: [${s.sample.slice(0,5).join(', ')} …]</div></div>
+  <div class="tile"><div class="cap">Метаданные на каждом чанке</div>
+   <div class="big">4+1</div><div>поля · <span class="ok">готово</span></div>
+   <div class="mono" style="margin-top:8px">source · title · section · chunk_id · strategy</div></div>
+  <div class="tile"><div class="cap">Сравнение 2 стратегий</div>
+   <div class="big">${s.comp.fixed.count} / ${s.comp.structural.count}</div><div>fixed / structural · <span class="ok">готово</span></div>
+   <div class="mono" style="margin-top:8px">fixed: ~${s.comp.fixed.avg}с ровно (${s.comp.fixed.lo}–${s.comp.fixed.hi})<br>struct: ~${s.comp.structural.avg}с, разброс ${s.comp.structural.lo}–${s.comp.structural.hi}</div></div>`;
+}
+
+function cardsFixed(arr){return arr.map((c,i)=>`<div class="card" style="animation-delay:${i*0.04}s">
+ <div class="m"><span class="chip">A${i+1}</span><span>${c.size} симв.</span></div>
+ <div class="t">${esc(c.text.slice(0,240))}…</div></div>`).join('')}
+function cardsStruct(arr){return arr.map((c,i)=>`<div class="card" style="animation-delay:${i*0.08}s">
+ <div class="sec">▸ ${esc(c.section)}</div>
+ <div class="m"><span class="chip">Б${i+1}</span><span>${c.size} симв.</span></div>
+ <div class="t">${esc(c.text.slice(0,240))}…</div></div>`).join('')}
+
+async function ensureSlice(){if(!SLICE)SLICE=await (await fetch('/api/slice')).json();return SLICE}
+async function showSlice(mode){
+ document.getElementById('tab-fixed').classList.toggle('on',mode==='fixed');
+ document.getElementById('tab-struct').classList.toggle('on',mode==='structural');
+ const d=await ensureSlice(); const box=document.getElementById('slice');
+ if(mode==='fixed') box.innerHTML=`<div class="col a"><h3 style="color:#d29922">Слепо по размеру · ${d.fixed.length} карточек</h3>${cardsFixed(d.fixed)}</div>`;
+ else if(mode==='structural') box.innerHTML=`<div class="col b"><h3 style="color:#3fb950">Структурно · ${d.structural.length} карточек</h3>${cardsStruct(d.structural)}</div>`;
+ else box.innerHTML=`<div class="cols"><div class="col a"><h3 style="color:#d29922">Слепо · ${d.fixed.length}</h3>${cardsFixed(d.fixed)}</div><div class="col b"><h3 style="color:#3fb950">Структурно · ${d.structural.length}</h3>${cardsStruct(d.structural)}</div></div>`;
+}
+
+async function doSearch(){
+ const q=document.getElementById('q').value.trim(); if(!q)return;
+ const box=document.getElementById('results');
+ box.innerHTML='<div class="loading">Ищу по смыслу…</div>';
+ const r=await (await fetch('/api/search?q='+encodeURIComponent(q))).json();
+ box.innerHTML=r.results.map((x,i)=>`<div class="res" style="animation-delay:${i*0.06}s">
+  <div class="h"><span class="chip">${esc(x.section)}</span><span class="cos">близость ${x.cos}</span></div>
+  <div>${esc(x.snippet)}…</div></div>`).join('') || '<div class="loading">Ничего не нашлось</div>';
+}
+
+loadSummary(); showSlice('fixed');
+document.getElementById('q').value='в какой позе укладывать младенца спать';
+</script></body></html>

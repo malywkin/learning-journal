@@ -1,0 +1,109 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Как ИИ ищет по смыслу</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font:16px/1.65 -apple-system,Segoe UI,Roboto,sans-serif;
+min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px}
+.wrap{width:100%;max-width:900px}
+h1{font-size:22px;font-weight:600;margin-bottom:2px}
+.step-no{color:#8b949e;font-size:13px;margin-bottom:18px}
+.stage{position:relative;height:420px;background:#0b0f14;border:1px solid #21262d;border-radius:14px;
+overflow:hidden;margin-bottom:18px}
+.axis{position:absolute;background:#1b222c}
+.dot{position:absolute;transform:translate(-50%,-50%);padding:6px 11px;border-radius:20px;font-size:13px;
+white-space:nowrap;background:#1f6feb22;border:1px solid #388bfd;color:#cfe1ff;
+transition:all 1.1s cubic-bezier(.4,0,.2,1);opacity:0}
+.dot.sleep{background:#1f6feb22;border-color:#58a6ff;color:#cfe1ff}
+.dot.safe{background:#3fb95022;border-color:#3fb950;color:#c7f0cf}
+.dot.food{background:#db6d2822;border-color:#e3853f;color:#f5d5b8}
+.dot.far{background:#8b949e22;border-color:#6e7681;color:#c9d1d9}
+.dot.q{background:#f8514922;border-color:#f85149;color:#ffd4d0;font-weight:600;font-size:14px}
+.dot.show{opacity:1}
+.halo{position:absolute;transform:translate(-50%,-50%);border-radius:50%;border:2px dashed #f85149;
+opacity:0;transition:all 1s ease;pointer-events:none}
+.halo.show{opacity:.7}
+.card{position:absolute;transform:translate(-50%,-50%);background:#161b22;border:1px solid #30363d;
+border-radius:8px;padding:10px 12px;font-size:13px;max-width:240px;transition:all 1s ease;opacity:0}
+.card.show{opacity:1}
+.narr{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px 18px;min-height:96px;
+font-size:15.5px}
+.narr b{color:#58a6ff}
+.controls{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:9px 18px;
+font-size:15px;cursor:pointer}
+button:hover:not(:disabled){background:#30363d}
+button:disabled{opacity:.4;cursor:default}
+.prog{color:#8b949e;font-size:13px}
+</style></head><body><div class="wrap">
+<h1>Как ИИ ищет по смыслу</h1>
+<div class="step-no" id="stepno"></div>
+<div class="stage" id="stage"></div>
+<div class="narr" id="narr"></div>
+<div class="controls">
+<button id="back">← Назад</button>
+<span class="prog" id="prog"></span>
+<button id="next">Дальше →</button>
+</div></div>
+<script>
+// точки-фразы: base — стартовая позиция (в кучу), map — место по смыслу (в %)
+const DOTS = [
+ {id:'d1',cls:'sleep',t:'малыш не спит',       base:[50,50], map:[26,30]},
+ {id:'d2',cls:'sleep',t:'просыпается ночью',   base:[50,50], map:[33,22]},
+ {id:'d3',cls:'sleep',t:'во сколько укладывать',base:[50,50],map:[22,40]},
+ {id:'d4',cls:'safe', t:'спать на спине',       base:[50,50], map:[76,28]},
+ {id:'d5',cls:'safe', t:'безопасность кроватки',base:[50,50], map:[82,40]},
+ {id:'d6',cls:'food', t:'кормление ночью',      base:[50,50], map:[52,72]},
+ {id:'d7',cls:'far',  t:'семейный бюджет',      base:[50,50], map:[88,84]},
+];
+const stage=document.getElementById('stage');
+// строим точки
+const nodes={};
+DOTS.forEach(d=>{const e=document.createElement('div');e.className='dot '+d.cls;e.id=d.id;e.textContent=d.t;
+ e.style.left=d.base[0]+'%';e.style.top=d.base[1]+'%';stage.appendChild(e);nodes[d.id]=e;});
+// halo для поиска
+const halo=document.createElement('div');halo.className='halo';stage.appendChild(halo);
+// вопрос-точка
+const q=document.createElement('div');q.className='dot q';q.textContent='? во сколько укладывать малыша';
+q.style.left='50%';q.style.top='-20%';stage.appendChild(q);
+// карточки-пояснялки
+function bigCard(html,x,y){const c=document.createElement('div');c.className='card';c.innerHTML=html;
+ c.style.left=x+'%';c.style.top=y+'%';stage.appendChild(c);return c;}
+const cardWords=bigCard('«малыш не спит» и «просыпается ночью»<br>— <b>разные слова</b>, один смысл',50,50);
+
+function place(map){DOTS.forEach(d=>{nodes[d.id].style.left=(map?d.map[0]:d.base[0])+'%';
+ nodes[d.id].style.top=(map?d.map[1]:d.base[1])+'%';});}
+function showDots(on){DOTS.forEach(d=>nodes[d.id].classList.toggle('show',on));}
+
+const STEPS=[
+ {no:'Шаг 1 из 6 · Проблема',
+  narr:'Ты спрашиваешь ИИ «во сколько укладывать малыша». Беда в том, что <b>твою книгу он не читал</b> — и вместо честного ответа выдаёт правдоподобную выдумку. Мы хотим, чтобы он отвечал, заглянув в конкретную книгу, и показывал, откуда взял.',
+  run(){showDots(false);cardWords.classList.remove('show');halo.classList.remove('show');q.style.opacity=0;}},
+ {no:'Шаг 2 из 6 · Что такое «по смыслу»',
+  narr:'Искать надо не по словам, а по смыслу. Вот две фразы: «малыш не спит» и «просыпается ночью». <b>Слова разные, а смысл один.</b> Обычный поиск по словам их не свяжет — а нам нужно, чтобы связал.',
+  run(){showDots(false);halo.classList.remove('show');q.style.opacity=0;cardWords.classList.add('show');}},
+ {no:'Шаг 3 из 6 · Карта смыслов',
+  narr:'Трюк такой: каждую фразу превращаем в <b>точку на карте смыслов</b>. Похожие по смыслу садятся рядом, разные — далеко. Смотри: три фразы про сон сбились в один угол, про безопасность — в другой, а «семейный бюджет» уехал вообще на отшиб — он не про малыша.',
+  run(){cardWords.classList.remove('show');halo.classList.remove('show');q.style.opacity=0;
+        showDots(true);place(true);}},
+ {no:'Шаг 4 из 6 · Это и есть эмбеддинг',
+  narr:'Кто ставит точку на карту? Наша модель <b>bge-m3</b>. Она читает кусок текста и выдаёт его координаты — просто длинный список чисел. Это и называется <b>эмбеддинг</b>: текст на входе, точка (числа) на выходе. Похожий смысл — близкие числа.',
+  run(){showDots(true);place(true);halo.classList.remove('show');q.style.opacity=0;}},
+ {no:'Шаг 5 из 6 · Поиск',
+  narr:'Теперь сам вопрос «во сколько укладывать» прогоняем через <b>ту же машинку</b> — он тоже становится точкой (красная). Дальше просто: берём <b>ближайшие к ней точки</b> — вот эти три про сон, они рядом. Их и отдадим ИИ как опору для ответа.',
+  run(){showDots(true);place(true);q.style.left='24%';q.style.top='33%';q.style.opacity=1;
+        halo.style.left='27%';halo.style.top='31%';halo.style.width='230px';halo.style.height='230px';
+        halo.classList.add('show');}},
+ {no:'Шаг 6 из 6 · Наш индекс',
+  narr:'Ровно это мы и построили сегодня: книгу порезали на 174 карточки, каждую bge-m3 превратила в точку, всё сложили в базу. Настоящую карту этих 174 точек покажет Atlas — там ты увидишь такие же кластеры, только из реальной книги. <b>Вот и весь RAG: смысл → координаты → ближайшие → ответ со ссылкой.</b>',
+  run(){showDots(true);place(true);q.style.opacity=0;halo.classList.remove('show');}},
+];
+
+let i=0;
+const nb=document.getElementById('next'),bb=document.getElementById('back'),
+ nr=document.getElementById('narr'),sn=document.getElementById('stepno'),pr=document.getElementById('prog');
+function render(){const s=STEPS[i];s.run();nr.innerHTML=s.narr;sn.textContent=s.no;
+ pr.textContent=(i+1)+' / '+STEPS.length;bb.disabled=i===0;nb.disabled=i===STEPS.length-1;}
+nb.onclick=()=>{if(i<STEPS.length-1){i++;render();}};
+bb.onclick=()=>{if(i>0){i--;render();}};
+render();
+</script></body></html>
