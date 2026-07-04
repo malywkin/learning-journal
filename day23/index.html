@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 23 — Реранкинг и фильтрация</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171c22; --panel2:#1e242c; --ink:#e8edf2; --dim:#95a1ad;
+    --line:#2a323c; --accent:#6ea8fe; --good:#5fd0a0; --warn:#e0b455; --bad:#e07a7a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:radial-gradient(1100px 640px at 72% -12%,#1a2230,#0f1216 60%);
+    color:var(--ink); font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1160px; margin:0 auto; padding:22px 22px 70px}
+  .kicker{color:var(--accent); font-weight:600; font-size:12.5px; letter-spacing:.05em; text-transform:uppercase}
+  h1{margin:.1em 0 .1em; font-size:24px}
+  .sub{color:var(--dim); font-size:14px; margin-bottom:20px}
+  .ask{display:flex; gap:10px; margin-bottom:8px}
+  input[type=text]{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink);
+    border-radius:11px; padding:13px 15px; font-size:15px}
+  input[type=text]:focus{outline:none; border-color:var(--accent)}
+  button{background:var(--accent); color:#0b1017; border:none; border-radius:11px; padding:13px 20px;
+    font-size:15px; font-weight:600; cursor:pointer; white-space:nowrap}
+  button:hover{filter:brightness(1.08)} button:disabled{opacity:.4; cursor:default}
+  .chips{display:flex; gap:7px; flex-wrap:wrap; margin:2px 0 16px}
+  .chip{background:var(--panel2); border:1px solid var(--line); color:var(--dim); border-radius:20px;
+    padding:6px 12px; font-size:12.5px; cursor:pointer}
+  .chip:hover{color:var(--ink); border-color:var(--accent)}
+  .controls{display:flex; gap:20px; align-items:center; flex-wrap:wrap; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px; font-size:13.5px}
+  .controls label{color:var(--dim); display:flex; align-items:center; gap:8px}
+  .controls input[type=range]{width:120px}
+  .controls .val{color:var(--ink); font-variant-numeric:tabular-nums; min-width:30px; display:inline-block}
+  .switch{position:relative; width:38px; height:22px}
+  .switch input{opacity:0; width:0; height:0}
+  .slider{position:absolute; inset:0; background:var(--panel2); border:1px solid var(--line);
+    border-radius:20px; transition:.2s; cursor:pointer}
+  .slider:before{content:""; position:absolute; height:16px; width:16px; left:2px; top:2px;
+    background:var(--dim); border-radius:50%; transition:.2s}
+  .switch input:checked + .slider{background:#1c3a2c; border-color:#244a3a}
+  .switch input:checked + .slider:before{transform:translateX(16px); background:var(--good)}
+  .rw{margin:14px 0; font-size:13px; color:var(--dim)}
+  .rw b{color:var(--accent)}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:6px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; min-height:120px}
+  .card h3{margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:9px}
+  .tag{font-size:11px; padding:2px 9px; border-radius:20px; border:1px solid var(--line)}
+  .tag.base{color:var(--warn); border-color:#4a3f24; background:#241f12}
+  .tag.impr{color:var(--good); border-color:#244a3a; background:#12241c}
+  .card .hint{color:var(--dim); font-size:12px; margin-bottom:12px}
+  .chunk{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:7px; transition:.25s}
+  .chunk.drop{opacity:.4}
+  .chunk.drop .txt{text-decoration:line-through; text-decoration-color:var(--bad)}
+  .chunk.keep{border-color:#244a3a}
+  .chunk .top{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:3px}
+  .chunk .src{color:var(--accent); font-weight:600; font-size:11.5px}
+  .chunk .txt{font-size:12px; color:#c4ccd4}
+  .nums{display:flex; gap:6px; font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap}
+  .pill{padding:1px 7px; border-radius:6px; border:1px solid var(--line)}
+  .pill.cos{color:var(--dim)}
+  .pill.score{color:var(--good); border-color:#244a3a; background:#0f1c16}
+  .pill.score.low{color:var(--bad); border-color:#3a2426; background:#1c1315}
+  .cut{border-top:2px dashed var(--bad); margin:9px 2px; position:relative; height:0}
+  .cut span{position:absolute; right:0; top:-9px; font-size:10.5px; color:var(--bad);
+    background:var(--panel); padding:0 6px}
+  .ansbox{margin-top:12px; border-top:1px solid var(--line); padding-top:11px}
+  .ans{white-space:pre-wrap; font-size:13.5px}
+  .badge{display:inline-block; font-size:11px; padding:2px 8px; border-radius:6px; margin-bottom:6px}
+  .badge.ok{background:#12241c; color:var(--good); border:1px solid #244a3a}
+  .badge.no{background:#231316; color:var(--bad); border:1px solid #4a2a2c}
+  .cite{color:var(--good); font-weight:600}
+  .spin{color:var(--dim); font-size:13px}
+  .legend{margin-top:22px; font-size:12.5px; color:var(--dim); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:12px 16px}
+  .legend b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">Ассистент по родительству · под капотом</div>
+  <h1>День 23 — реранкинг и фильтрация</h1>
+  <div class="sub">Один вопрос, две сборки. Слева — поиск как в Дне 22. Справа — тот же поиск,
+    но сверху реранкер переоценил куски и порог отсёк мусор. Смотри, как двигаются оценки.</div>
+
+  <div class="ask">
+    <input id="q" type="text" placeholder="Спроси про детский сон…" value="как уложить ребёнка спать?">
+    <button id="go">Сравнить</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="controls">
+    <label><span class="switch"><input type="checkbox" id="rw"><span class="slider"></span></span>
+      переписать вопрос (rewrite)</label>
+    <label>порог отсечения
+      <input type="range" id="th" min="0" max="1" step="0.05" value="0.30">
+      <span class="val" id="thv">0.30</span></label>
+    <label>top-K (сколько оставить)
+      <input type="range" id="k" min="1" max="10" step="1" value="5">
+      <span class="val" id="kv">5</span></label>
+  </div>
+
+  <div class="rw" id="rwline" style="display:none"></div>
+
+  <div class="cols">
+    <div class="card" id="baseCard">
+      <h3><span class="tag base">Было</span> голый поиск (День 22)</h3>
+      <div class="hint">top-K прямо из поиска, по близости к теме. Мусор проходит.</div>
+      <div id="base"></div>
+    </div>
+    <div class="card" id="imprCard">
+      <h3><span class="tag impr">Стало</span> реранк + порог</h3>
+      <div class="hint">поиск дал 20 → реранкер оценил каждый → порог отрезал → осталось лучшее.</div>
+      <div id="impr"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <b>cos</b> — близость из поиска (День 21): «на ту же ли тему». <b>score</b> — оценка реранкера
+    (День 23): «отвечает ли на вопрос». Кусок с высоким cos, но низким score — это и есть
+    «по теме, но мимо». Режем по score.
+  </div>
+</div>
+
+<script>
+const examples = [
+  "как уложить ребёнка спать?",
+  "почему ребёнок просыпается ночью?",
+  "в какой позе класть младенца спать?",
+  "как оформить налоговый вычет?",
+];
+const chips = document.getElementById('chips');
+examples.forEach(e=>{
+  const el = document.createElement('span'); el.className='chip'; el.textContent=e;
+  el.onclick=()=>{ document.getElementById('q').value=e; go(); };
+  chips.appendChild(el);
+});
+
+const thEl=document.getElementById('th'), kEl=document.getElementById('k');
+thEl.oninput=()=>document.getElementById('thv').textContent=(+thEl.value).toFixed(2);
+kEl.oninput=()=>document.getElementById('kv').textContent=kEl.value;
+
+function chunkRow(c, showScore){
+  const dropped = showScore && c.kept===false;
+  const kept = showScore && c.kept===true;
+  const cls = dropped?'drop':(kept?'keep':'');
+  const scoreCls = (c.score!==undefined && c.score < (+thEl.value)) ? 'score low':'score';
+  const nums = `<span class="pill cos">cos ${c.cos ?? '—'}</span>` +
+    (showScore ? `<span class="pill ${scoreCls}">score ${c.score}</span>` : '');
+  return `<div class="chunk ${cls}">
+    <div class="top"><span class="src">${c.section||'—'}</span><span class="nums">${nums}</span></div>
+    <div class="txt">${(c.text||'').slice(0,150)}…</div></div>`;
+}
+
+function renderSide(el, data, showScore){
+  const list = showScore ? data.graded : data.final;
+  let html = '';
+  if(showScore){
+    // отсортировано по score; вставим черту порога между kept и dropped
+    let cutInserted=false;
+    list.forEach(c=>{
+      if(!cutInserted && c.kept===false){ html+=`<div class="cut"><span>порог ${(+thEl.value).toFixed(2)}</span></div>`; cutInserted=true; }
+      html += chunkRow(c, true);
+    });
+  } else {
+    list.forEach(c=> html += chunkRow(c, false));
+  }
+  const ab = data.abstained
+    ? `<span class="badge no">отказ: в источниках нет</span>`
+    : `<span class="badge ok">ответ по источникам</span>`;
+  const ans = (data.answer||'').replace(/\[Источник (\d+)\]/g,'<span class="cite">[Источник $1]</span>');
+  el.innerHTML = html + `<div class="ansbox">${ab}<div class="ans">${ans}</div></div>`;
+}
+
+async function go(){
+  const q=document.getElementById('q').value.trim(); if(!q) return;
+  const btn=document.getElementById('go'); btn.disabled=true; btn.textContent='Думаю…';
+  document.getElementById('base').innerHTML='<div class="spin">поиск…</div>';
+  document.getElementById('impr').innerHTML='<div class="spin">реранкер + модель (первый раз дольше)…</div>';
+  document.getElementById('rwline').style.display='none';
+  try{
+    const r=await fetch('/compare',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:q, use_rewrite:document.getElementById('rw').checked,
+        top_k:+kEl.value, threshold:+thEl.value})});
+    const d=await r.json();
+    renderSide(document.getElementById('base'), d.baseline, false);
+    renderSide(document.getElementById('impr'), d.improved, true);
+    if(d.improved.use_rewrite && d.improved.queries.length>1){
+      const rl=document.getElementById('rwline'); rl.style.display='block';
+      rl.innerHTML='Вопрос размножен: '+d.improved.queries.map(x=>`<b>${x}</b>`).join(' · ');
+    }
+  }catch(e){
+    document.getElementById('impr').innerHTML='<div class="spin">ошибка: '+e+'</div>';
+  }
+  btn.disabled=false; btn.textContent='Сравнить';
+}
+document.getElementById('go').onclick=go;
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+</script>
+</body>
+</html>

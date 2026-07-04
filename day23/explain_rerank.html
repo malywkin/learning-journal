@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 23 — Реранкинг: второй этаж поиска</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --ink:#1d1d1f; --muted:#6b6b70; --line:#e2e0d8;
+    --card:#fffdf8; --accent:#b8482e; --accent2:#2e6db8; --good:#2f7d54;
+    --bad:#b8482e; --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 30px rgba(0,0,0,.06);
+    --mono:'SF Mono',ui-monospace,Menlo,monospace;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 22px 80px}
+  header h1{font-family:var(--serif);font-size:26px;font-weight:600;margin:0 0 4px}
+  header p.sub{color:var(--muted);margin:0 0 22px;font-size:15px}
+  .progress{display:flex;gap:6px;margin:0 0 22px;flex-wrap:wrap}
+  .dot{height:6px;flex:1;min-width:28px;border-radius:3px;background:var(--line);transition:background .3s}
+  .dot.on{background:var(--accent)}
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:26px 26px 22px;box-shadow:var(--shadow);min-height:430px;
+    display:flex;flex-direction:column}
+  .tag{display:inline-block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin-bottom:8px}
+  .stage h2{font-family:var(--serif);font-size:22px;font-weight:600;margin:0 0 12px}
+  .stage p{margin:0 0 12px;font-size:15.5px}
+  .stage p.small{font-size:14px;color:var(--muted)}
+  b.hl{color:var(--accent);font-weight:600}
+  b.hl2{color:var(--accent2);font-weight:600}
+  .term{background:#efe9df;border-radius:8px;padding:2px 8px;font-family:var(--mono);
+    font-size:13px;color:#5a3d2e;white-space:nowrap}
+  .nav{display:flex;justify-content:space-between;align-items:center;margin-top:20px;gap:12px}
+  button{font-family:var(--sans);font-size:15px;padding:10px 20px;border-radius:10px;
+    border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;
+    transition:transform .06s,box-shadow .2s}
+  button:hover{box-shadow:var(--shadow)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button:disabled{opacity:.35;cursor:default;box-shadow:none}
+  .step-label{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  /* сцена */
+  .scene{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;margin:6px 0}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .node{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;
+    text-align:center;font-size:13.5px;min-width:96px;transition:.35s;position:relative}
+  .node .k{font-family:var(--serif);font-weight:600;font-size:15px;display:block}
+  .node.dim{opacity:.32;filter:grayscale(.4)}
+  .node.weak{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 4px rgba(184,72,46,.09)}
+  .node.hot{border-color:var(--accent2);border-width:2px;box-shadow:0 0 0 4px rgba(46,109,184,.09)}
+  .arrow{color:var(--muted);font-size:20px}
+  /* куски */
+  .chips{display:flex;flex-direction:column;gap:8px}
+  .chip{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;
+    padding:9px 13px;background:#fff;font-size:14px;transition:.4s;opacity:1}
+  .chip .txt{flex:1}
+  .chip .sc{font-family:var(--mono);font-size:13px;color:var(--muted);white-space:nowrap}
+  .chip.drop{opacity:.28;text-decoration:line-through;text-decoration-color:var(--bad)}
+  .chip.keep{border-color:var(--good);box-shadow:0 0 0 3px rgba(47,125,84,.08)}
+  .chip .badge{font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .chip.keep .badge{background:#e3f1e9;color:var(--good)}
+  .chip.drop .badge{background:#f6e2dd;color:var(--bad)}
+  .cut{border-top:2px dashed var(--accent);margin:2px 0;position:relative;height:0}
+  .cut span{position:absolute;right:0;top:-10px;font-size:11px;color:var(--accent);
+    background:var(--card);padding:0 6px;font-weight:600}
+  .pair{display:flex;gap:10px;align-items:stretch;margin:4px 0}
+  .pair .box{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;background:#fff}
+  .pair .box.q{background:#eef3fa}
+  .pair .plus{align-self:center;font-size:20px;color:var(--muted)}
+  .terms{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .trow{border:1px solid var(--line);border-radius:10px;padding:11px 14px;background:#fff;font-size:14px}
+  .trow b{font-family:var(--mono);font-size:13px;color:#5a3d2e}
+  .note{background:#eef3fa;border-left:3px solid var(--accent2);border-radius:0 8px 8px 0;
+    padding:10px 14px;font-size:14px;margin:4px 0}
+  .fade{animation:fade .45s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Реранкинг — второй этаж поиска</h1>
+    <p class="sub">День 23 · как отсеять «похоже, но мимо». Метафора одна на всё — наём на работу.</p>
+  </header>
+  <div class="progress" id="prog"></div>
+  <div class="stage">
+    <div class="scene" id="scene"></div>
+    <div class="nav">
+      <button id="prev">← Назад</button>
+      <span class="step-label" id="lbl"></span>
+      <button id="next" class="primary">Далее →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const stages = [
+  {
+    tag:'Мост от прошлого урока',
+    h:'Что мы уже собрали',
+    body:`<p>Пару дней назад мы сделали <b class="hl">RAG</b>: ты задаёшь вопрос, программа
+      находит в книге похожие куски и отдаёт их модели — та отвечает по ним.</p>
+      <p>Вся цепочка работает. Но слабое звено — ровно одно, оно подсвечено.</p>`,
+    scene:()=>flow([
+      {k:'Вопрос',t:''},
+      {k:'Поиск',t:'находит куски',cls:'weak'},
+      {k:'Модель',t:'пишет ответ'},
+      {k:'Ответ',t:''},
+    ]) + `<p class="small" style="text-align:center">Красным — <b class="hl">поиск</b>. Его сегодня и чиним.</p>`
+  },
+  {
+    tag:'В чём беда',
+    h:'«На ту же тему» ≠ «отвечает на вопрос»',
+    body:`<p>Поиск тащит куски, где много общих слов с вопросом. Спросим:
+      <b class="hl2">«как уложить ребёнка спать?»</b> — и среди найденного вылезает вот это.</p>
+      <p class="small">Тема совпадает (сон, ребёнок), а на вопрос кусок не отвечает — но по «похожести» он пролез.</p>`,
+    scene:()=>`<div class="chips">
+      ${chip('Ритуал перед сном: ванна, книжка, приглушённый свет','похоже','keep','отвечает')}
+      ${chip('Нарушения сна у детей — возможный признак неврологии','похоже','drop','мимо')}
+      ${chip('Сколько часов спит ребёнок в разном возрасте','похоже','drop','мимо')}
+    </div>
+    <p class="small">Все три — «про сон ребёнка». Но на «<i>как уложить</i>» отвечает только первый.
+    Поиск этого не различает.</p>`
+  },
+  {
+    tag:'Решение',
+    h:'Ставим два этажа',
+    body:`<p>Как в наёме: сначала <b class="hl">грубый фильтр</b> по резюме, потом
+      <b class="hl2">живой рекрутер</b> по короткому списку. Каждый делает своё.</p>
+      <p class="small">Первый — быстрый и тупой, отсеивает массу. Второй — медленный и внимательный, наводит порядок.</p>`,
+    scene:()=>flow([
+      {k:'Тысячи',t:'кусков книги'},
+      {k:'Фильтр',t:'быстро → 20',cls:'hot'},
+      {k:'Рекрутер',t:'точно → 5',cls:'hot'},
+      {k:'Модель',t:'ответ'},
+    ]) + `<div class="note">Первый этаж = наш вчерашний поиск. Второй этаж = сегодняшний
+      <b>реранкер</b>. Поиск не выкидываем — надстраиваем над ним.</div>`
+  },
+  {
+    tag:'Первый этаж',
+    h:'Грубый фильтр: тысячи → 20',
+    body:`<p>Он смотрит на вопрос и кусок <b class="hl">порознь</b>: заранее превратил каждый
+      кусок в числа-отпечаток, вопрос — тоже, и сравнил числа. Мгновенно, но грубо — «слово есть, беру».</p>
+      <p class="small">Это <span class="term">bi-encoder</span>. Он и притащил тот кусок про неврологию.</p>`,
+    scene:()=>flow([
+      {k:'1000+',t:'кусков',cls:'dim'},
+      {k:'bi-encoder',t:'сравнил числа',cls:'hot'},
+      {k:'top-20',t:'кандидатов'},
+    ]) + `<div class="pair">
+      <div class="box q"><b>Вопрос</b><br>как уложить спать?</div>
+      <div class="plus">≈</div>
+      <div class="box">каждый кусок — заранее в числа, <br>смотрим отдельно от вопроса</div>
+    </div>
+    <p class="small"><b class="hl">Порознь</b> — ключевое слово. Кусок сжат в отпечаток ещё до того,
+    как узнал твой вопрос.</p>`
+  },
+  {
+    tag:'Второй этаж',
+    h:'Рекрутер: читает пару вопрос+кусок вместе',
+    body:`<p>Реранкер берёт вопрос и кусок <b class="hl2">вместе, парой</b>, и оценивает именно
+      их связь: «отвечает ли <i>этот</i> кусок на <i>этот</i> вопрос?». Ставит каждому оценку годности.</p>
+      <p class="small">Это <span class="term">cross-encoder</span>. Медленно, по одному — зато видит то,
+      что фильтр пропустил.</p>`,
+    scene:()=>`<div class="pair">
+      <div class="box q"><b>Вопрос</b><br>как уложить спать?</div>
+      <div class="plus">+</div>
+      <div class="box"><b>Кусок</b><br>ритуал: ванна, книжка, свет</div>
+      <div class="plus">→</div>
+      <div class="box" style="background:#e3f1e9"><b>0.91</b><br>годится</div>
+    </div>
+    <div class="pair">
+      <div class="box q"><b>Вопрос</b><br>как уложить спать?</div>
+      <div class="plus">+</div>
+      <div class="box"><b>Кусок</b><br>нарушения сна — неврология</div>
+      <div class="plus">→</div>
+      <div class="box" style="background:#f6e2dd"><b>0.12</b><br>мимо</div>
+    </div>
+    <p class="small">Один и тот же кусок про неврологию: у фильтра пролез, у рекрутера получил
+    <b class="hl">0.12</b> и падает вниз.</p>`
+  },
+  {
+    tag:'Где черта',
+    h:'Кого оставить: число или порог',
+    body:`<p>Оценки есть — теперь режем. Два способа, задание просит поиграть <b>обоими</b>.</p>
+      <p class="small"><span class="term">top-K</span> — «бери ровно 5 лучших».
+      <span class="term">порог</span> — «бери всех выше черты, хоть троих, хоть восьмерых».</p>`,
+    scene:()=>`<div class="chips">
+      ${chipS('Ритуал перед сном: ванна, книжка, свет','0.91','keep')}
+      ${chipS('Как настроить тёмную комнату для сна','0.74','keep')}
+      `+cut('порог 0.5')+`
+      ${chipS('Сколько часов спит ребёнок по возрасту','0.31','drop')}
+      ${chipS('Нарушения сна — признак неврологии','0.12','drop')}
+    </div>
+    <p class="small">Порог 0.5 оставил двоих. Будь вопрос легче — прошло бы больше; не будь ответа
+    в книге вообще — прошло бы ноль, и мы честно скажем «не знаю».</p>`
+  },
+  {
+    tag:'Итог',
+    h:'Собираем всё вместе',
+    body:`<p>Полный путь дня. Красное звено из первого шага теперь прикрыто вторым этажом.</p>`,
+    scene:()=>flow([
+      {k:'Вопрос',t:''},
+      {k:'bi-encoder',t:'→ top-20',cls:'hot'},
+      {k:'cross-encoder',t:'оценил → порог',cls:'hot'},
+      {k:'top-5',t:'чистые куски',cls:''},
+      {k:'Модель',t:'ответ'},
+    ]) + `<div class="terms">
+      <div class="trow"><b>реранкинг</b> — второй, внимательный проход; переставляет по годности.</div>
+      <div class="trow"><b>bi-encoder</b> — быстрый поиск, смотрит вопрос и кусок порознь (фильтр-HR).</div>
+      <div class="trow"><b>cross-encoder</b> — реранкер, читает пару вместе (рекрутер).</div>
+      <div class="trow"><b>top-K</b> — сколько кусков оставляем (было 20 → стало 5).</div>
+      <div class="trow"><b>порог</b> — черта по оценке: ниже — выкидываем.</div>
+    </div>`
+  },
+];
+
+function flow(nodes){
+  return `<div class="flow">` + nodes.map((n,i)=>{
+    const a = i<nodes.length-1 ? `<span class="arrow">→</span>` : '';
+    return `<div class="node ${n.cls||''}"><span class="k">${n.k}</span>${n.t}</div>${a}`;
+  }).join('') + `</div>`;
+}
+function chip(txt,sc,cls,badge){
+  return `<div class="chip ${cls}"><span class="txt">${txt}</span>
+    <span class="badge">${badge}</span></div>`;
+}
+function chipS(txt,sc,cls){
+  const b = cls==='keep'?'оставить':'выкинуть';
+  return `<div class="chip ${cls}"><span class="txt">${txt}</span>
+    <span class="sc">${sc}</span><span class="badge">${b}</span></div>`;
+}
+function cut(label){ return `<div class="cut"><span>${label}</span></div>`; }
+
+let i = 0;
+const scene = document.getElementById('scene');
+const lbl = document.getElementById('lbl');
+const prev = document.getElementById('prev');
+const next = document.getElementById('next');
+const prog = document.getElementById('prog');
+stages.forEach(()=>{ const d=document.createElement('div'); d.className='dot'; prog.appendChild(d); });
+
+function render(){
+  const s = stages[i];
+  scene.innerHTML = `<div class="fade"><span class="tag">${s.tag}</span>
+    <h2>${s.h}</h2>${s.body}${s.scene?s.scene():''}</div>`;
+  lbl.textContent = `${i+1} / ${stages.length}`;
+  prev.disabled = i===0;
+  next.textContent = i===stages.length-1 ? 'Готово' : 'Далее →';
+  [...prog.children].forEach((d,k)=>d.classList.toggle('on',k<=i));
+}
+prev.onclick = ()=>{ if(i>0){i--;render();} };
+next.onclick = ()=>{ if(i<stages.length-1){i++;render();} };
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight') next.click();
+  if(e.key==='ArrowLeft') prev.click();
+});
+render();
+</script>
+</body>
+</html>

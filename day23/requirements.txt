@@ -1,0 +1,10 @@
+# День 23 — реранкинг и фильтрация (второй этап после поиска Дня 22).
+# Реранкер грузится через sentence-transformers (CrossEncoder), модель — BAAI/bge-reranker-v2-m3.
+# Остальное наследуем из Дней 21–22 (эмбеддер bge-m3, индекс sqlite-vec, клиент OpenRouter).
+sentence-transformers>=5.0      # CrossEncoder-реранкер + эмбеддер bge-m3
+torch>=2.0                      # backend для моделей
+openai>=1.40                    # генератор через OpenRouter (rewrite + ответ)
+fastapi>=0.110                  # веб-демо (стеклянный ящик)
+uvicorn>=0.29                   # ASGI-сервер
+python-dotenv>=1.0              # ключ из .env
+sqlite-vec>=0.1                 # чтение индекса Дня 21
