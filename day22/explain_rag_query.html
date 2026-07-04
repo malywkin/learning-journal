@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 22 — Первый RAG-запрос: экзамен с открытой книгой</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171c22; --panel2:#1e242c; --ink:#e8edf2; --dim:#95a1ad;
+    --line:#2a323c; --accent:#6ea8fe; --good:#5fd0a0; --warn:#e0b455; --bad:#e07a7a;
+    --paper:#f4efe4; --paperink:#2a2620; --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #1a2230 0%, var(--bg) 60%);
+    color:var(--ink); font:16px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  header{padding:22px 28px 8px}
+  .kicker{color:var(--accent); font-weight:600; letter-spacing:.04em; font-size:13px; text-transform:uppercase}
+  h1{margin:.15em 0 .1em; font-size:26px; font-weight:700}
+  .sub{color:var(--dim); font-size:15px}
+  main{flex:1; display:flex; flex-direction:column; padding:8px 28px 12px; max-width:1080px; width:100%; margin:0 auto}
+  .stage{
+    position:relative; background:linear-gradient(180deg,var(--panel),#12171d);
+    border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow);
+    padding:26px; min-height:430px; overflow:hidden;
+  }
+  .steptitle{display:flex; align-items:center; gap:12px; margin-bottom:6px}
+  .steptitle .num{
+    width:30px;height:30px;flex:0 0 30px;border-radius:9px;background:var(--panel2);
+    border:1px solid var(--line); display:grid;place-items:center; color:var(--accent); font-weight:700; font-size:15px;
+  }
+  .steptitle h2{margin:0; font-size:20px}
+  .lead{color:var(--dim); margin:2px 0 18px; font-size:15px}
+  .scene{display:grid; gap:18px}
+  /* карточки-панели */
+  .cards{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .card{background:var(--panel2); border:1px solid var(--line); border-radius:14px; padding:16px}
+  .card h3{margin:0 0 8px; font-size:15px; display:flex; align-items:center; gap:8px}
+  .tag{font-size:12px; padding:2px 9px; border-radius:20px; border:1px solid var(--line)}
+  .tag.norag{color:var(--warn); border-color:#4a3f24; background:#241f12}
+  .tag.rag{color:var(--good); border-color:#244a3a; background:#12241c}
+  .muted{color:var(--dim); font-size:14px}
+  /* бумага / выданные страницы */
+  .desk{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start}
+  .paper{
+    background:var(--paper); color:var(--paperink); border-radius:8px; padding:12px 13px; width:210px;
+    box-shadow:0 6px 16px rgba(0,0,0,.4); position:relative; font-size:13px; line-height:1.45;
+    border-top:3px solid #cdbf9c;
+  }
+  .paper .src{font-weight:700; font-size:11px; color:#8a6d2f; letter-spacing:.03em; margin-bottom:4px; display:block}
+  .paper.first{outline:2px solid var(--good); outline-offset:2px}
+  .paper.mid{opacity:.5}
+  .envelope{
+    background:var(--panel2); border:1px dashed #3a4550; border-radius:14px; padding:16px; display:grid; gap:12px;
+  }
+  .slab{background:#12171d; border:1px solid var(--line); border-radius:10px; padding:11px 13px}
+  .slab .lbl{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); font-weight:600; margin-bottom:4px}
+  .slab.rules{border-left:3px solid var(--accent)}
+  .slab.ctx{border-left:3px solid var(--warn)}
+  .slab.q{border-left:3px solid var(--good)}
+  code{background:#0c1015; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:13px; color:#cfe0ff}
+  .answer{border-radius:12px; padding:13px 15px; font-size:14.5px; line-height:1.5}
+  .answer.bad{background:#231316; border:1px solid #4a2a2c}
+  .answer.good{background:#12241c; border:1px solid #244a3a}
+  .answer .who{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin-bottom:5px}
+  .cite{color:var(--good); font-weight:600}
+  .halluc{color:var(--bad); text-decoration:underline dotted}
+  .flow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--dim); font-size:14px}
+  .chip{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:8px 12px; color:var(--ink)}
+  .arrow{color:var(--accent); font-weight:700}
+  .callout{background:#161d2b; border:1px solid #2a3a55; border-radius:12px; padding:12px 15px; font-size:14px}
+  .callout b{color:var(--accent)}
+  .attn{position:relative; height:66px; margin-top:6px}
+  .attn .bar{position:absolute; bottom:0; width:15%; background:linear-gradient(180deg,var(--accent),#2b4a7a); border-radius:5px 5px 0 0}
+  .attn .lab{position:absolute; bottom:-20px; font-size:11px; color:var(--dim); width:15%; text-align:center}
+  ul.tight{margin:6px 0 0; padding-left:18px} ul.tight li{margin:4px 0}
+  /* появление */
+  .fade{opacity:0; transform:translateY(10px); animation:rise .5s ease forwards}
+  .d1{animation-delay:.05s}.d2{animation-delay:.2s}.d3{animation-delay:.35s}.d4{animation-delay:.5s}.d5{animation-delay:.65s}
+  @keyframes rise{to{opacity:1; transform:none}}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(110,168,254,.0)}50%{box-shadow:0 0 0 6px rgba(110,168,254,.12)}}
+  /* навигация */
+  .nav{display:flex; align-items:center; gap:14px; margin-top:16px}
+  button{
+    background:var(--accent); color:#0b1017; border:none; border-radius:10px; padding:11px 20px; font-size:15px;
+    font-weight:600; cursor:pointer; transition:filter .15s}
+  button:hover{filter:brightness(1.08)} button:disabled{opacity:.35; cursor:default}
+  button.ghost{background:var(--panel2); color:var(--ink); border:1px solid var(--line)}
+  .dots{display:flex; gap:7px; margin-left:auto}
+  .dot{width:9px;height:9px;border-radius:50%; background:var(--line); cursor:pointer}
+  .dot.on{background:var(--accent); transform:scale(1.25)}
+  .foot{color:var(--dim); font-size:12.5px; padding:6px 28px 18px; max-width:1080px; margin:0 auto; width:100%}
+  svg{display:block}
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">День 22 · Неделя RAG · поверх Дня 21</div>
+  <h1>Первый RAG-запрос</h1>
+  <div class="sub">Одна сцена на весь день: <b>экзамен с открытой книгой</b>. Листай по шагу →</div>
+</header>
+
+<main>
+  <div class="stage" id="stage"></div>
+  <div class="nav">
+    <button class="ghost" id="prev">← Назад</button>
+    <button id="next">Дальше →</button>
+    <div class="dots" id="dots"></div>
+  </div>
+</main>
+<div class="foot" id="foot"></div>
+
+<script>
+const ICON = {
+  book:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6ea8fe" stroke-width="1.8"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M19 3v18"/></svg>',
+  brain:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e0b455" stroke-width="1.8"><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-1 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0V4a2 2 0 0 0-1-1z"/></svg>',
+  glasses:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5fd0a0" stroke-width="1.8"><circle cx="6" cy="15" r="3"/><circle cx="18" cy="15" r="3"/><path d="M9 15a3 3 0 0 1 6 0M3 12l2-3M21 12l-2-3"/></svg>',
+  check:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd0a0" stroke-width="2.2"><path d="M4 12l5 5L20 6"/></svg>',
+};
+const foot = document.getElementById('foot');
+
+const steps = [
+// 0 — МОСТ
+{
+  n:'0', t:'Что осталось со вчера — и чего не хватало',
+  lead:'День 21 собрал справочник и научился находить в нём нужные страницы. Но найти — это ещё не ответить.',
+  html:`
+  <div class="scene">
+    <div class="flow fade d1">
+      <span class="chip">Вопрос по-русски</span>
+      <span class="arrow">→</span>
+      <span class="chip">${ICON.book} индекс книги (День 21)</span>
+      <span class="arrow">→</span>
+      <span class="chip">нашли 3 подходящие страницы</span>
+    </div>
+    <div class="cards">
+      <div class="card fade d2">
+        <h3>Что уже умеем</h3>
+        <div class="muted">По вопросу «в какой позе укладывать младенца спать» индекс достаёт из книги про сон именно те куски, где про это написано. Это <b>ретривал</b> — поиск по смыслу.</div>
+      </div>
+      <div class="card fade d3" style="border-color:#4a3f24">
+        <h3>Где обрывалось</h3>
+        <div class="muted">Куски просто лежат на столе. Их никто <i>не прочитал</i> и ответ словами <i>не написал</i>. За столом пустой стул.</div>
+      </div>
+    </div>
+    <div class="callout fade d4"><b>Сегодня:</b> сажаем за стол того, кто прочитает эти страницы и напишет ответ, — <b>генеративную модель</b> (gpt-oss). Замыкаем цепочку: вопрос → поиск → <b>ответ</b>.</div>
+  </div>`,
+  foot:'Мост с Днём 21. Ретривал (поиск кусков) готов; сегодня добавляем генерацию (чтение кусков и ответ).'
+},
+// 1 — ДВА РЕЖИМА
+{
+  n:'1', t:'Два способа сдать экзамен',
+  lead:'Задание требует поставить рядом два режима одной и той же модели. Это буквально два студента за одним столом.',
+  html:`
+  <div class="scene">
+    <div class="cards">
+      <div class="card fade d1">
+        <h3>${ICON.brain} <span>По памяти</span> <span class="tag norag">без RAG</span></h3>
+        <div class="muted">Книгу закрыли. Студент отвечает тем, что «выучил» на тренировке — на всём интернете сразу. Звучит гладко, но откуда факт — неизвестно, и легко <span class="halluc">придумает правдоподобное</span>.</div>
+      </div>
+      <div class="card fade d2">
+        <h3>${ICON.glasses} <span>С открытой книгой</span> <span class="tag rag">с RAG</span></h3>
+        <div class="muted">Тот же студент, но перед ним положили <b>именно те страницы</b> из Дня 21 и правила: отвечай по ним и ссылайся на источник. Ответ опирается на вашу книгу, а не на «среднее по интернету».</div>
+      </div>
+    </div>
+    <div class="callout fade d3">Модель <b>одна и та же</b>. Разница только в том, что лежит у неё на столе. Весь RAG — про <b>подготовку стола</b>, а не про смену «мозга».</div>
+  </div>`,
+  foot:'Без RAG = ответ по обучающим данным. С RAG = ответ по подсунутому контексту. Модель одна, отличается вход.'
+},
+// 2 — AUGMENTED PROMPT
+{
+  n:'2', t:'Что кладём студенту на стол — augmented-промпт',
+  lead:'«Объединение вопроса с чанками» из задания — это и есть сборка одного письма модели из трёх частей.',
+  html:`
+  <div class="scene">
+    <div class="envelope fade d1">
+      <div class="slab rules fade d1"><div class="lbl">1 · Правила экзамена (инструкция)</div>
+        Отвечай <b>только</b> по выданным страницам. Нет ответа в них — напиши «в источниках нет». Ставь номер: <code>[Источник N]</code>.</div>
+      <div class="slab ctx fade d2"><div class="lbl">2 · Выданные страницы (контекст = найденные чанки)</div>
+        <code>[Источник 1]</code> «Always put baby on her back to sleep…»<br>
+        <code>[Источник 2]</code> «Room-sharing without bed-sharing…»<br>
+        <code>[Источник 3]</code> «A firm sleep surface…»</div>
+      <div class="slab q fade d3"><div class="lbl">3 · Вопрос</div>
+        «В какой позе безопаснее укладывать младенца спать?»</div>
+    </div>
+    <div class="callout fade d4">Это письмо целиком уходит модели как один промпт. Термин дня — <b>augmented-промпт</b> (дополненный): к вопросу «прикрутили» найденное знание. Порядок частей не случайный — про него следующий шаг.</div>
+  </div>`,
+  foot:'Augmented-промпт = инструкция (grounding + правило отказа + требование цитат) + размеченные чанки + вопрос. Сборка этого письма — узкое место качества.'
+},
+// 3 — ПОРЯДОК / LOST IN THE MIDDLE
+{
+  n:'3', t:'Почему важен порядок страниц',
+  lead:'Проверенный на фронтире факт: модель читает начало и конец внимательнее, чем середину. «Lost in the middle».',
+  html:`
+  <div class="scene">
+    <div class="cards">
+      <div class="card fade d1">
+        <h3>Стопка на столе</h3>
+        <div class="desk" style="margin-top:6px">
+          <div class="paper first"><span class="src">[Источник 1] · самый релевантный</span>кладём <b>сверху</b> — читается лучше всего</div>
+          <div class="paper mid"><span class="src">[Источник 2] · середина</span>сюда внимание проседает</div>
+          <div class="paper"><span class="src">[Источник 3] · конец</span>конец тоже читается хорошо</div>
+        </div>
+      </div>
+      <div class="card fade d2">
+        <h3>Внимание по позиции</h3>
+        <div class="attn">
+          <div class="bar" style="left:2%;  height:90%"></div><div class="lab" style="left:2%">нач.</div>
+          <div class="bar" style="left:22%; height:45%"></div><div class="lab" style="left:22%"></div>
+          <div class="bar" style="left:42%; height:32%"></div><div class="lab" style="left:42%">серед.</div>
+          <div class="bar" style="left:62%; height:46%"></div><div class="lab" style="left:62%"></div>
+          <div class="bar" style="left:82%; height:80%"></div><div class="lab" style="left:82%">конец</div>
+        </div>
+        <div class="muted" style="margin-top:26px">U-образная кривая: провал в середине держится даже на моделях с окном в миллион токенов.</div>
+      </div>
+    </div>
+    <div class="callout fade d3"><b>Честная оговорка:</b> у нас в контекст идёт 3–5 кусков — середины почти нет, эффект копеечный. Но привычка «сильное — по краям» правильная, и на большой базе она уже решает. А цифру «первый кусок = ×2.3 внимания» из блогов я проверил — <b>беспруф</b>, в неё не идём.</div>
+  </div>`,
+  foot:'Lost in the middle — подтверждено. Релевантное класть в начало/конец. Конкретные множители внимания — блоговые выдумки, отброшены фактчеком.'
+},
+// 4 — ABSTAIN
+{
+  n:'4', t:'Главный момент дня — честный отказ (abstain)',
+  lead:'Вопрос, которого в книге нет. Здесь два режима расходятся сильнее всего — это и снимем на видео.',
+  html:`
+  <div class="scene">
+    <div class="slab q fade d1" style="border-left-color:var(--bad)">Вопрос вне книги про сон: «<b>Какая сейчас ставка по ипотеке?</b>»</div>
+    <div class="cards">
+      <div class="answer bad fade d2">
+        <div class="who">${ICON.brain} без RAG — по памяти</div>
+        «Ставка составляет <span class="halluc">около 9,5%</span>…» — сказал уверенно, <b>выдумал</b>. Источника нет, проверить нельзя.
+      </div>
+      <div class="answer good fade d3">
+        <div class="who">${ICON.glasses} с RAG — по правилам</div>
+        «<b>В выданных источниках ответа нет.</b>» Честно отказался — в книге про сон про ипотеку ничего.
+      </div>
+    </div>
+    <div class="callout fade d4"><b>Контринтуитивно (свежее у Google):</b> открытая книга сама по себе делает студента <i>самоувереннее</i> и подталкивает врать, если контекст не по теме — у одной модели враньё скакнуло с 10% до 66%. Поэтому правило «нет ответа — откажись» это не вежливость, а <b>несущая опора</b>. Для ассистента по ребёнку честное «не знаю» безопаснее правдоподобной догадки.</div>
+  </div>`,
+  foot:'Abstain — обязательный guardrail. RAG парадоксально снижает готовность отказаться; правило отказа возвращает её. Тут же самый яркий контраст двух режимов.'
+},
+// 5 — FAITHFULNESS
+{
+  n:'5', t:'Как понять, что студент не сжульничал',
+  lead:'Ответ может выглядеть правильным, но быть написан по памяти с прицепленной для вида ссылкой.',
+  html:`
+  <div class="scene">
+    <div class="cards">
+      <div class="card fade d1">
+        <h3>Faithfulness — «по страницам, а не из головы»</h3>
+        <div class="muted">Проверяем: каждое утверждение ответа реально стоит в выданных кусках? Если да — ответ <b>заземлён</b>. Это центральная метрика качества генерации.</div>
+      </div>
+      <div class="card fade d2" style="border-color:#4a2a2c">
+        <h3>Ловушка: correct ≠ faithful</h3>
+        <div class="muted">Студент ответил из памяти, а <code>[Источник 2]</code> прицепил задним числом «для вида». Ссылка есть, но опоры не было. На фронтире таких «подогнанных» цитат до <b>57%</b>.</div>
+      </div>
+    </div>
+    <div class="callout fade d3"><b>И потолок безопасности:</b> даже честный ответ по странице неверен, если <i>сама страница</i> неверна. Faithfulness проверяет «верен источнику», а не «верен правде». Поэтому у нашего ассистента по родительству <b>качество корпуса = потолок</b> — ядро на гайдлайнах, книги как мнение.</div>
+    <div class="callout fade d4">Отсюда «усиление» задания — <b>10 контрольных вопросов</b>: на каждый заранее записано, что должно быть в ответе и какая страница обязана сработать. Среди них 2–3 <i>вне книги</i> — проверка честного отказа.</div>
+  </div>`,
+  foot:'Faithfulness = опора на контекст (не факт-чек мира). correct≠faithful — ссылка не доказывает опору. Корпус = потолок безопасности. 10 вопросов = golden set с эталоном и источником.'
+},
+// 6 — ИТОГ / В КОД
+{
+  n:'6', t:'Что из этого идёт в код прямо сейчас',
+  lead:'Собираем ровно то, что требует задание, с защитами из брифа.',
+  html:`
+  <div class="scene">
+    <div class="cards">
+      <div class="card fade d1">
+        <h3>${ICON.check} Функция-петля</h3>
+        <div class="muted">вопрос → ретривал Дня 21 → сборка augmented-промпта → ответ модели со ссылками.</div>
+      </div>
+      <div class="card fade d2">
+        <h3>${ICON.check} Два режима рядом</h3>
+        <div class="muted">без RAG и с RAG на gpt-oss-120b, температура 0 — видно расхождение вживую.</div>
+      </div>
+      <div class="card fade d3">
+        <h3>${ICON.check} Защиты</h3>
+        <div class="muted">строгий grounding, честный abstain, релевантное по краям, метки <code>[Источник N]</code>.</div>
+      </div>
+      <div class="card fade d4">
+        <h3>${ICON.check} 10 контрольных вопросов</h3>
+        <div class="muted">golden set: ожидание + нужный раздел; часть — заведомо вне базы.</div>
+      </div>
+    </div>
+    <div class="callout fade d5">Всё это встанет в стеклянный ящик поверх витрины Дня 21: задаёшь вопрос — два ответа встают бок о бок, и под RAG-ответом видно, <b>какие куски он реально получил</b>. Из этого экрана потом вырастет чат-продукт.</div>
+  </div>`,
+  foot:'План кода Дня 22. Дальше — вопросы по механике, затем пишу код и поднимаю демо.'
+},
+];
+
+let i = 0;
+const stage=document.getElementById('stage'), dots=document.getElementById('dots');
+const prev=document.getElementById('prev'), next=document.getElementById('next');
+function render(){
+  const s=steps[i];
+  stage.innerHTML=`<div class="steptitle"><div class="num">${s.n}</div><h2>${s.t}</h2></div>
+    <div class="lead">${s.lead}</div>${s.html}`;
+  foot.textContent=s.foot;
+  prev.disabled=i===0; next.disabled=i===steps.length-1;
+  next.textContent = i===steps.length-1 ? 'Готово' : 'Дальше →';
+  [...dots.children].forEach((d,k)=>d.classList.toggle('on',k===i));
+}
+steps.forEach((_,k)=>{const d=document.createElement('div');d.className='dot';d.onclick=()=>{i=k;render()};dots.appendChild(d)});
+prev.onclick=()=>{if(i>0){i--;render()}};
+next.onclick=()=>{if(i<steps.length-1){i++;render()}};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')next.click();if(e.key==='ArrowLeft')prev.click()});
+render();
+</script>
+</body>
+</html>
