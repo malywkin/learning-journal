@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка цитаты — как код ловит выдумку</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a3441;
+    --ink:#e6edf3; --dim:#8b98a5; --faint:#5b6672;
+    --accent:#58a6ff; --accentdim:#1f6feb;
+    --ok:#3fb950; --okbg:#12261a; --bad:#f85149; --badbg:#2a1416;
+    --warn:#d29922; --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:32px 20px 80px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:22px;font-weight:650;letter-spacing:-.01em;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:14px;margin:0 0 26px}
+  .sub b{color:var(--ink);font-weight:600}
+
+  /* case picker */
+  .cases{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  .case{appearance:none;border:1px solid var(--line);background:var(--panel);
+    color:var(--dim);font-family:var(--sans);font-size:13px;font-weight:550;
+    padding:9px 14px;border-radius:9px;cursor:pointer;transition:.15s;display:flex;
+    align-items:center;gap:8px}
+  .case:hover{border-color:var(--faint);color:var(--ink)}
+  .case.on{background:var(--accentdim);border-color:var(--accent);color:#fff}
+  .case .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.55}
+  .case.real .dot{background:var(--ok);opacity:1}
+  .case.fake .dot{background:var(--bad);opacity:1}
+  .case.cosm .dot{background:var(--warn);opacity:1}
+  .case.para .dot{background:var(--bad);opacity:1}
+
+  /* stage */
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px 22px 20px;margin-bottom:16px}
+  .lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+    font-weight:650;margin-bottom:10px}
+
+  /* the chunk text as character cells */
+  .textwrap{position:relative;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:18px 16px;overflow:hidden}
+  .chunk{font-family:var(--mono);font-size:15px;line-height:2.35;letter-spacing:.5px;
+    position:relative;z-index:2;white-space:nowrap}
+  .ch{position:relative;transition:color .12s,background .12s;border-radius:3px;padding:1px 0}
+  .ch.match{color:var(--ok);background:rgba(63,185,80,.16)}
+  .ch.miss{color:var(--bad);background:rgba(248,81,73,.16)}
+  .ch.locked{color:#fff;background:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+  /* sliding frame */
+  .frame{position:absolute;z-index:1;top:0;height:0;border:2px solid var(--accent);
+    border-radius:6px;background:rgba(88,166,255,.08);
+    transition:left .16s cubic-bezier(.4,0,.2,1),width .16s,opacity .2s,
+      border-color .2s,background .2s;pointer-events:none;opacity:0}
+  .frame.show{opacity:1}
+  .frame.hit{border-color:var(--ok);background:rgba(63,185,80,.12)}
+  .frame.done{border-color:var(--bad);background:rgba(248,81,73,.10)}
+
+  /* the quote line */
+  .quotebar{display:flex;align-items:center;gap:12px;margin-top:16px}
+  .qtag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+    font-weight:650;flex:none;width:74px}
+  .quote{font-family:var(--mono);font-size:14px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--ink);
+    letter-spacing:.4px}
+
+  /* fuzzy panel */
+  .fuzzy{margin-top:18px;border-top:1px dashed var(--line);padding-top:18px;display:none}
+  .fuzzy.show{display:block}
+  .align{font-family:var(--mono);font-size:14px;letter-spacing:.5px;line-height:2.1}
+  .align .row{display:flex;gap:2px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+  .align .rlab{width:96px;flex:none;font-family:var(--sans);font-size:11px;
+    color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-weight:650}
+  .align .cc{border-radius:3px;padding:0 .5px}
+  .align .cc.eq{color:var(--ok)}
+  .align .cc.df{color:var(--bad);background:rgba(248,81,73,.14)}
+  .meter{margin-top:16px;display:flex;align-items:center;gap:14px}
+  .track{position:relative;flex:1;height:10px;background:var(--panel2);border-radius:6px;
+    border:1px solid var(--line);overflow:hidden}
+  .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:6px;
+    background:var(--warn);transition:width .5s cubic-bezier(.4,0,.2,1),background .3s}
+  .thresh{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--dim);opacity:.8}
+  .thresh::after{content:"порог 90";position:absolute;top:-17px;left:50%;
+    transform:translateX(-50%);font-family:var(--sans);font-size:9px;color:var(--dim);
+    white-space:nowrap;letter-spacing:.04em}
+  .pct{font-family:var(--mono);font-size:20px;font-weight:600;width:64px;text-align:right;
+    flex:none;font-variant-numeric:tabular-nums}
+
+  /* verdict */
+  .verdict{margin-top:16px;border-radius:12px;padding:16px 18px;display:flex;
+    align-items:center;gap:14px;opacity:0;transform:translateY(6px);
+    transition:.3s;border:1px solid transparent}
+  .verdict.show{opacity:1;transform:none}
+  .verdict.ok{background:var(--okbg);border-color:rgba(63,185,80,.4)}
+  .verdict.bad{background:var(--badbg);border-color:rgba(248,81,73,.4)}
+  .verdict svg{flex:none}
+  .verdict .vt{font-weight:650;font-size:15px}
+  .verdict .vd{color:var(--dim);font-size:13px;margin-top:1px}
+  .verdict.ok .vt{color:var(--ok)} .verdict.bad .vt{color:var(--bad)}
+
+  /* status line above stage */
+  .status{font-size:13px;color:var(--dim);min-height:20px;margin:2px 0 14px;
+    font-family:var(--mono);letter-spacing:.2px}
+  .status b{color:var(--accent);font-weight:600}
+  .status .g{color:var(--ok)} .status .r{color:var(--bad)}
+
+  /* controls */
+  .ctrls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);font-family:var(--sans);font-size:13px;font-weight:550;
+    padding:9px 16px;border-radius:9px;cursor:pointer;transition:.15s;display:flex;
+    align-items:center;gap:7px}
+  .btn:hover{border-color:var(--faint)}
+  .btn.pri{background:var(--accentdim);border-color:var(--accent);color:#fff}
+  .btn.pri:hover{background:var(--accent)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .speed{margin-left:auto;display:flex;align-items:center;gap:9px;color:var(--dim);
+    font-size:12px}
+  .speed input{accent-color:var(--accent)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;color:var(--faint);
+    font-size:12px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:3px;flex:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Проверка цитаты — как код ловит выдумку</h1>
+  <p class="sub">День 24. Модель вернула цитату. Код ищет её <b>в сыром тексте чанка</b> —
+    буква в букву. Движение рамки ниже — это <b>сам поиск</b>, а не украшение.</p>
+
+  <div class="cases" id="cases"></div>
+
+  <div class="status" id="status"></div>
+
+  <div class="stage">
+    <div class="lbl">Текст чанка&nbsp;·&nbsp;то, что реально лежит в книге</div>
+    <div class="textwrap">
+      <div class="frame" id="frame"></div>
+      <div class="chunk" id="chunk"></div>
+    </div>
+    <div class="quotebar">
+      <span class="qtag">Цитата</span>
+      <span class="quote" id="quote"></span>
+    </div>
+
+    <div class="fuzzy" id="fuzzy">
+      <div class="lbl">Точно не совпало — включаю нестрогое сравнение</div>
+      <div class="align" id="align"></div>
+      <div class="meter">
+        <div class="track"><div class="thresh" style="left:90%"></div><div class="fill" id="fill"></div></div>
+        <div class="pct" id="pct">0%</div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+
+    <div class="ctrls">
+      <button class="btn pri" id="play">Пуск</button>
+      <button class="btn" id="step">Шаг</button>
+      <button class="btn" id="reset">Сброс</button>
+      <div class="speed">Скорость
+        <input type="range" id="speed" min="1" max="5" value="3">
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--accent)"></span>рамка = текущая позиция поиска</span>
+    <span><span class="sw" style="background:var(--ok)"></span>символ совпал</span>
+    <span><span class="sw" style="background:var(--bad)"></span>символ не совпал</span>
+    <span><span class="sw" style="background:var(--warn)"></span>нестрогая похожесть</span>
+  </div>
+</div>
+
+<script>
+const CHUNK = "A consistent bedtime helps regulate a child's internal clock.";
+
+// каждый кейс: цитата, что модель положила в графу «Цитата»
+const CASES = {
+  real: { cls:"real", name:"Настоящая цитата",
+    quote:"helps regulate a child's internal clock",
+    note:"взята из книги дословно" },
+  fake: { cls:"fake", name:"Выдумка",
+    quote:"babies need exactly 12 hours of sleep",
+    note:"складно и по теме — но в книге такого нет" },
+  cosm: { cls:"cosm", name:"Другие кавычки",
+    quote:"helps regulate a child’s internal clock", // fancy apostrophe
+    note:"та же фраза, но апостроф типографский ’, а не '" },
+  para: { cls:"para", name:"Перефраз",
+    quote:"a regular routine tunes the child body clock",
+    note:"смысл близкий, но слова другие — это уже пересказ" },
+};
+
+const $ = s=>document.querySelector(s);
+const chunkEl=$("#chunk"), frameEl=$("#frame"), quoteEl=$("#quote"),
+      statusEl=$("#status"), verdictEl=$("#verdict"), fuzzyEl=$("#fuzzy"),
+      alignEl=$("#align"), fillEl=$("#fill"), pctEl=$("#pct");
+
+let cur="real", cells=[], timer=null, playing=false;
+let plan=[], pc=0;                 // сценарий шагов и указатель
+const SPEED=[0,520,360,240,150,80]; // ms по уровню 1..5
+let speed=3;
+
+// --- нормализация: то, что код прощает (кавычки/апострофы/пробелы/регистр) ---
+function norm(s){
+  return s.replace(/[‘’ʼ]/g,"'").replace(/[“”]/g,'"')
+          .replace(/\s+/g," ").trim().toLowerCase();
+}
+// расстояние Левенштейна → похожесть 0..100
+function ratio(a,b){
+  a=norm(a); b=norm(b);
+  const m=a.length,n=b.length; if(!m&&!n)return 100;
+  const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);
+  }
+  return Math.round((1-d[m][n]/Math.max(m,n))*100);
+}
+// лучшее окно в тексте под partial-сравнение (для перефраза/косметики visual)
+function bestWindow(text,q){
+  const nt=text, m=Math.min(q.length,nt.length); let best={score:-1,at:0};
+  for(let i=0;i+q.length<=nt.length;i++){
+    const seg=nt.slice(i,i+q.length), r=ratio(seg,q);
+    if(r>best.score)best={score:r,at:i,seg};
+  }
+  return best;
+}
+
+// --- построить кейс-кнопки ---
+const casesEl=$("#cases");
+Object.entries(CASES).forEach(([k,c])=>{
+  const b=document.createElement("button");
+  b.className="case "+c.cls+(k===cur?" on":"");
+  b.innerHTML=`<span class="dot"></span>${c.name}`;
+  b.onclick=()=>{selectCase(k)};
+  b.dataset.k=k; casesEl.appendChild(b);
+});
+
+function selectCase(k){
+  cur=k; stop();
+  [...casesEl.children].forEach(b=>b.classList.toggle("on",b.dataset.k===k));
+  buildPlan();
+  render(true);
+}
+
+// --- разложить текст чанка на ячейки-символы ---
+function layout(){
+  chunkEl.innerHTML="";
+  cells=[...CHUNK].map((ch,i)=>{
+    const s=document.createElement("span");
+    s.className="ch"; s.textContent=ch; s.dataset.i=i;
+    chunkEl.appendChild(s); return s;
+  });
+}
+
+// поставить рамку на позицию i, ширина = длина цитаты (в символах чанка)
+function placeFrame(i,len){
+  const a=cells[i], b=cells[Math.min(i+len-1,cells.length-1)];
+  if(!a||!b){frameEl.classList.remove("show");return;}
+  const wrapBox=$(".textwrap").getBoundingClientRect();
+  const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+  // рамка на той же строке (простые чанки — одна-две строки; берём по вертикали от a)
+  frameEl.style.left=(ra.left-wrapBox.left-3)+"px";
+  frameEl.style.top=(ra.top-wrapBox.top-3)+"px";
+  frameEl.style.width=(rb.right-ra.left+6)+"px";
+  frameEl.style.height=(ra.height+2)+"px";
+  frameEl.classList.add("show");
+}
+
+function clearMarks(){cells.forEach(c=>c.className="ch");}
+
+/* ------- СЦЕНАРИЙ (plan): массив шагов-функций-описаний ------- */
+function buildPlan(){
+  plan=[]; pc=0;
+  const c=CASES[cur];
+  const raw=c.quote;
+  const target=norm(raw);
+  const hay=norm(CHUNK);
+  const exactHit=hay.indexOf(target);      // после нормализации — есть ли точное вхождение
+
+  // Фаза 1: скольжение окна точного поиска (по нормализованному сравнению посимвольно)
+  const qlen=raw.length;
+  // сопоставляем позиции окна в терминах ЯЧЕЕК чанка (грубо: по длине сырой цитаты)
+  const steps=Math.max(1,CHUNK.length-qlen+1);
+  // найдём позицию наилучшего окна в СЫРОМ тексте для точного случая
+  const bw=bestWindow(CHUNK,raw);
+  const stopAt = exactHit>=0 ? bw.at : (steps-1);
+
+  for(let i=0;i<=stopAt;i++){
+    const seg=CHUNK.slice(i,i+qlen);
+    const per=ratio(seg,raw);
+    const isHit = exactHit>=0 && i===bw.at && norm(seg)===target;
+    plan.push({type:"slide", i, qlen, seg, per, isHit,
+      status:`Точный поиск · позиция ${i} · совпадение ${per}%`});
+    if(isHit) break;
+  }
+
+  if(exactHit>=0){
+    plan.push({type:"lock", i:bw.at, qlen, status:`<span class="g">Найдено дословно.</span> Цитата настоящая.`});
+    plan.push({type:"verdict", ok:true,
+      title:"Цитата подтверждена",
+      desc:c.cls==="cosm"
+        ? "Отличались только кавычки — их выровняла нормализация, дальше совпало буква в букву."
+        : "Фраза дословно есть в тексте чанка."});
+    return;
+  }
+
+  // не нашли точно → нормализация как отдельный видимый шаг (для косметики это спасает)
+  if(norm(raw)!==raw.toLowerCase() || /[‘’“”]/.test(raw)){
+    plan.push({type:"normalize", status:`Точно не совпало → <b>нормализую</b> кавычки и пробелы…`});
+    const hay2=norm(CHUNK), t2=norm(raw), hit2=hay2.indexOf(t2);
+    if(hit2>=0){
+      const bw2=bestWindow(CHUNK,raw);
+      plan.push({type:"lock", i:bw2.at, qlen, status:`<span class="g">После нормализации совпало.</span>`});
+      plan.push({type:"verdict", ok:true, title:"Цитата подтверждена",
+        desc:"Отличие было косметическим (типографский апостроф). Слова — те же."});
+      return;
+    }
+  }
+
+  // всё ещё нет → нестрогое сравнение (fuzzy)
+  const bw3=bestWindow(CHUNK,raw);
+  plan.push({type:"fuzzy-open", seg:bw3.seg, per:bw3.score,
+    status:`Даже после нормализации нет. Нестрогое сравнение с самым похожим местом…`});
+  plan.push({type:"fuzzy-fill", per:bw3.score,
+    status:`Похожесть <b>${bw3.score}%</b> — ${bw3.score>=90?'<span class="g">выше порога':'<span class="r">ниже порога'} 90</span>`});
+  const pass=bw3.score>=90;
+  plan.push({type:"verdict", ok:pass,
+    title: pass?"Цитата подтверждена":"Цитата отклонена как выдумка",
+    desc: pass?"Отличия косметические, слова совпали."
+              :"Другие слова, а не другие кавычки. Это пересказ или выдумка — под ответ не годится."});
+}
+
+/* ------- исполнение одного шага ------- */
+function applyStep(s){
+  statusEl.innerHTML=s.status||"";
+  if(s.type==="slide"){
+    clearMarks();
+    placeFrame(s.i,s.qlen);
+    frameEl.className="frame show";
+    // посимвольная подсветка внутри окна (наивное сравнение до первого расхождения)
+    const seg=[...s.seg]; const q=[...CASES[cur].quote];
+    for(let k=0;k<seg.length;k++){
+      const cell=cells[s.i+k]; if(!cell)break;
+      const eq = norm(seg[k])===norm(q[k]||"");
+      cell.classList.add(eq?"match":"miss");
+      if(!eq)break; // как в реальном наивном поиске — стоп на первом несовпадении
+    }
+  }
+  else if(s.type==="lock"){
+    clearMarks();
+    placeFrame(s.i,s.qlen); frameEl.className="frame show hit";
+    for(let k=0;k<s.qlen;k++){const cell=cells[s.i+k];if(cell)cell.classList.add("locked");}
+  }
+  else if(s.type==="normalize"){
+    frameEl.className="frame show";
+    quoteEl.style.transition="color .4s"; quoteEl.style.color="var(--warn)";
+    setTimeout(()=>{quoteEl.textContent=norm(CASES[cur].quote).replace(/\b\w/g,m=>m);
+      quoteEl.style.color="var(--ink)";},260);
+  }
+  else if(s.type==="fuzzy-open"){
+    frameEl.className="frame show done";
+    fuzzyEl.classList.add("show");
+    renderAlign(s.seg,CASES[cur].quote);
+    fillEl.style.width="0%"; pctEl.textContent="0%";
+  }
+  else if(s.type==="fuzzy-fill"){
+    requestAnimationFrame(()=>{
+      fillEl.style.width=s.per+"%";
+      fillEl.style.background=s.per>=90?"var(--ok)":"var(--bad)";
+    });
+    animatePct(s.per);
+  }
+  else if(s.type==="verdict"){
+    showVerdict(s.ok,s.title,s.desc);
+    if(!s.ok)frameEl.className="frame show done";
+  }
+}
+
+function renderAlign(seg,q){
+  // выравниваем по позициям (простое посимвольное — для наглядности diff)
+  const A=[...norm(seg)], B=[...norm(q)], L=Math.max(A.length,B.length);
+  const rowChunk=document.createElement("div"), rowQ=document.createElement("div");
+  rowChunk.className="row"; rowQ.className="row";
+  rowChunk.innerHTML='<span class="rlab">в книге</span>';
+  rowQ.innerHTML='<span class="rlab">в цитате</span>';
+  for(let k=0;k<L;k++){
+    const a=A[k]??" ", b=B[k]??" ", eq=a===b;
+    const ca=document.createElement("span"); ca.className="cc "+(eq?"eq":"df");
+    ca.textContent=a===" "?"·":a; rowChunk.appendChild(ca);
+    const cb=document.createElement("span"); cb.className="cc "+(eq?"eq":"df");
+    cb.textContent=b===" "?"·":b; rowQ.appendChild(cb);
+  }
+  alignEl.innerHTML=""; alignEl.appendChild(rowChunk); alignEl.appendChild(rowQ);
+}
+function animatePct(to){
+  let v=0; const t=setInterval(()=>{v+=Math.max(1,Math.round(to/18));
+    if(v>=to){v=to;clearInterval(t);} pctEl.textContent=v+"%";
+    pctEl.style.color=to>=90?"var(--ok)":"var(--bad)";},26);
+}
+function showVerdict(ok,title,desc){
+  verdictEl.className="verdict show "+(ok?"ok":"bad");
+  const ic=ok
+    ?'<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="var(--ok)" stroke-width="1.6"/><path d="M7 12.5l3.2 3.2L17 9" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    :'<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="var(--bad)" stroke-width="1.6"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="var(--bad)" stroke-width="2" stroke-linecap="round"/></svg>';
+  verdictEl.innerHTML=`${ic}<div><div class="vt">${title}</div><div class="vd">${desc}</div></div>`;
+}
+
+/* ------- проигрыватель ------- */
+function next(){
+  if(pc>=plan.length){stop();return false;}
+  applyStep(plan[pc]); pc++; return true;
+}
+function tick(){ if(!next()){return;} timer=setTimeout(tick,SPEED[speed]); }
+function play(){ if(playing)return; if(pc>=plan.length)render(true);
+  playing=true; $("#play").textContent="Пауза"; $("#play").classList.remove("pri");
+  tick(); }
+function pause(){ playing=false; clearTimeout(timer); $("#play").textContent="Пуск";
+  $("#play").classList.add("pri"); }
+function stop(){ pause(); }
+function render(resetToStart){
+  if(resetToStart){pc=0;}
+  clearMarks(); frameEl.className="frame"; verdictEl.className="verdict";
+  fuzzyEl.classList.remove("show");
+  const c=CASES[cur];
+  quoteEl.textContent=c.quote;
+  statusEl.innerHTML=`<b>${c.name}</b> — ${c.note}. Нажми «Пуск».`;
+}
+
+$("#play").onclick=()=>{ playing?pause():play(); };
+$("#step").onclick=()=>{ pause(); next(); };
+$("#reset").onclick=()=>{ stop(); buildPlan(); render(true); };
+$("#speed").oninput=e=>{ speed=+e.target.value; };
+window.addEventListener("resize",()=>{ if(plan[pc-1]&&plan[pc-1].type==="slide")
+  placeFrame(plan[pc-1].i,plan[pc-1].qlen); });
+
+// init
+layout(); buildPlan(); render(true);
+</script>
+</body>
+</html>

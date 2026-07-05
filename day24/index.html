@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>День 24 — цитаты, источники, анти-галлюцинации</title>
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e6e4df;
+    --ok:#1a7f4b; --okbg:#e7f4ec; --bad:#b3261e; --badbg:#fbeae9;
+    --accent:#0b6bcb; --accentbg:#e8f1fb; --warn:#8a6d00; --warnbg:#fbf4dd;
+    --bar:#cfe2f7; --bardrop:#e9e7e2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 20px;font-size:14px}
+  .badge{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:var(--accentbg);color:var(--accent);font-weight:600;vertical-align:middle}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted);margin:0 0 12px;font-weight:700}
+  textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;
+    font:inherit;resize:vertical;min-height:64px;background:#fff}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  button{border:0;border-radius:10px;padding:10px 18px;font:inherit;font-weight:600;
+    background:var(--ink);color:#fff;cursor:pointer}
+  button.ghost{background:#eceae5;color:var(--ink)}
+  button:disabled{opacity:.5;cursor:default}
+  .chip{font-size:13px;padding:6px 12px;border-radius:20px;background:#eceae5;
+    color:var(--ink);cursor:pointer;border:1px solid var(--line)}
+  .chip:hover{background:#e2e0da}
+  .answer{font-size:20px;line-height:1.45;letter-spacing:-.01em}
+  .status{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px}
+  .s-ok{background:var(--okbg);color:var(--ok)}
+  .s-abst{background:var(--warnbg);color:var(--warn)}
+  .s-bad{background:var(--badbg);color:var(--bad)}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .quote{font-style:italic;color:#333}
+  .cand{margin:7px 0}
+  .cand .meta{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+  .track{height:16px;background:#f1efea;border-radius:6px;position:relative;overflow:hidden}
+  .fill{height:100%;background:var(--bar)}
+  .cand.drop .fill{background:var(--bardrop)}
+  .thr{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--bad);opacity:.7}
+  .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px}
+  .t-keep{background:var(--okbg);color:var(--ok)}
+  .t-drop{background:#eceae5;color:var(--muted)}
+  .verline{display:flex;gap:10px;align-items:flex-start;margin:8px 0;
+    padding:10px;border-radius:10px;background:#faf9f7;border:1px solid var(--line)}
+  .mark{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+    color:#fff;font-size:13px;font-weight:800;margin-top:1px}
+  .m-ok{background:var(--ok)} .m-bad{background:var(--bad)}
+  .kv{font-size:12px;color:var(--muted);margin-top:3px}
+  .judge{display:flex;gap:10px;align-items:center}
+  .dot{width:10px;height:10px;border-radius:50%}
+  pre{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:12px;
+    overflow-x:auto;font-size:12.5px;margin:0}
+  .axis{position:relative;height:70px;margin:22px 6px 6px}
+  .axisline{position:absolute;top:44px;left:0;right:0;height:2px;background:var(--line)}
+  .adot{position:absolute;top:38px;width:14px;height:14px;border-radius:50%;
+    transform:translateX(-7px);border:2px solid #fff}
+  .a-in{background:var(--accent)} .a-trap{background:var(--bad)}
+  .athr{position:absolute;top:24px;bottom:6px;width:2px;background:#111}
+  .atick{position:absolute;top:52px;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+  .hidden{display:none}
+  .legend{font-size:12px;color:var(--muted);margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:5px;margin-right:14px}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#161514;--card:#201f1d;--ink:#ececec;--muted:#9a978f;--line:#332f2a;
+      --bar:#274a6b;--bardrop:#2c2a26;--okbg:#12301f;--badbg:#3a1512;--accentbg:#12263c;
+      --warnbg:#2e2708}
+    textarea,.chip,button.ghost{background:#2a2825;color:var(--ink)}
+    pre,.verline,.athr{background:#1b1a18}
+    .track{background:#2a2825}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ассистент по родительству <span class="badge" id="prov">под капотом</span></h1>
+  <p class="sub">День 24 — как ответ прибивается к книге: два предохранителя против выдумки.
+    Слева направо — живой след одного вопроса через конвейер.</p>
+
+  <div class="card">
+    <h2>Вопрос</h2>
+    <textarea id="q" placeholder="Спросите что-нибудь про сон и безопасность младенца…">В какой позе безопаснее всего укладывать младенца спать?</textarea>
+    <div class="row">
+      <button id="ask">Спросить</button>
+      <label class="small muted">порог&nbsp;<span id="thv">0.54</span>
+        <input id="thr" type="range" min="0" max="0.9" step="0.01" value="0.54"></label>
+      <button class="ghost small" id="calbtn">Калибровка порога (10 вопросов)</button>
+    </div>
+    <div class="row">
+      <span class="chip" data-q="В какой позе безопаснее всего укладывать младенца спать?">безопасный вопрос</span>
+      <span class="chip" data-q="он заебал ныть по вечерам, что делать?">грубый слэнг</span>
+      <span class="chip" data-q="Какая сейчас ставка по ипотеке в России?">ловушка (нет в базе)</span>
+    </div>
+  </div>
+
+  <div id="cal" class="card hidden">
+    <h2>Калибровка порога — где поставить черту</h2>
+    <p class="small muted">Прогнали 10 контрольных вопросов, у каждого записали лучшую оценку
+      реранкера. Свои кучкуются справа, ловушки — слева. Черту ставим в яму между ними.</p>
+    <div class="axis" id="axis"></div>
+    <div class="legend">
+      <span><i class="dot a-in" style="width:11px;height:11px;border-radius:50%"></i> свой (ответ в базе)</span>
+      <span><i class="dot a-trap" style="width:11px;height:11px;border-radius:50%"></i> ловушка</span>
+      <span>│ чёрная черта — текущий порог</span>
+    </div>
+    <p class="small" id="calnote"></p>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e; };
+const esc = s => (s||"").replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+
+fetch('/health').then(r=>r.json()).then(h=>{ $('#prov').textContent = h.provider+' · '+h.model; });
+
+$('#thr').oninput = e => $('#thv').textContent = (+e.target.value).toFixed(2);
+document.querySelectorAll('.chip').forEach(c=> c.onclick=()=>{ $('#q').value=c.dataset.q; ask(); });
+$('#ask').onclick = ask;
+$('#calbtn').onclick = calibrate;
+
+function statusBadge(r){
+  if(r.abstained) return '<span class="status s-abst">отказ: ниже порога</span>';
+  if(r.status==='model_abstained') return '<span class="status s-abst">отказ: нет в источниках</span>';
+  if(r.status==='unverifiable') return '<span class="status s-bad">не подтверждено ссылкой</span>';
+  return '<span class="status s-ok">ответ подтверждён</span>';
+}
+
+async function ask(){
+  $('#ask').disabled=true; $('#out').innerHTML='<p class="muted">Считаю конвейер…</p>';
+  try{
+    const r = await (await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:$('#q').value, threshold:+$('#thr').value})})).json();
+    render(r);
+  }catch(e){ $('#out').innerHTML='<p class="s-bad">Ошибка: '+esc(''+e)+'</p>'; }
+  $('#ask').disabled=false;
+}
+
+function render(r){
+  const out = $('#out'); out.innerHTML='';
+
+  // 1. ОТВЕТ
+  const a = el('div','card');
+  a.innerHTML = `<h2>Ответ ${statusBadge(r)}</h2><div class="answer">${esc(r.answer)}</div>`;
+  out.appendChild(a);
+
+  // 2. ВХОД — порог по оценке реранкера
+  const g = el('div','card');
+  g.innerHTML = `<h2>Предохранитель на входе — порог реранкера (лучший балл ${(r.top_score||0).toFixed(3)}, черта ${(+$('#thr').value).toFixed(2)})</h2>`;
+  const graded = r.graded||[];
+  if(!graded.length){ g.appendChild(el('p','muted small','поиск не дал кандидатов')); }
+  graded.slice(0,8).forEach(c=>{
+    const keep=c.kept;
+    const line=el('div','cand'+(keep?'':' drop'));
+    line.innerHTML =
+      `<div class="meta"><span>${esc((c.section||'—').slice(0,54))}</span>
+        <span>${(c.score||0).toFixed(3)} <span class="tag ${keep?'t-keep':'t-drop'}">${keep?'прошёл':'ниже черты'}</span></span></div>
+       <div class="track"><div class="fill" style="width:${Math.round((c.score||0)*100)}%"></div>
+         <div class="thr" style="left:${Math.round((+$('#thr').value)*100)}%"></div></div>`;
+    g.appendChild(line);
+  });
+  if(r.abstained) g.appendChild(el('p','s-abst small','Ни один кусок не прошёл черту → ассистент честно отказывается, не выдумывает.'));
+  out.appendChild(g);
+  if(r.abstained) return;
+
+  // 3. КОНТРАКТ — сырая тройка от модели
+  const c = el('div','card');
+  c.innerHTML = `<h2>Контракт — что вернула модель ${r.parse_ok?'':'<span class="status s-bad">JSON не разобран</span>'}</h2>`;
+  c.appendChild(el('pre',null,esc(JSON.stringify({answer:r.model_answer, sources:r.sources, quotes:r.quotes}, null, 2))));
+  out.appendChild(c);
+
+  // 4. ВЫХОД — проверка цитат кодом
+  const v = el('div','card');
+  v.innerHTML = `<h2>Предохранитель на выходе — проверка цитат кодом (substring → fuzzy)</h2>`;
+  if(!(r.checked||[]).length){ v.appendChild(el('p','muted small','модель не дала цитат')); }
+  (r.checked||[]).forEach(x=>{
+    const ok=x.matched;
+    const line=el('div','verline');
+    line.innerHTML =
+      `<div class="mark ${ok?'m-ok':'m-bad'}">${ok?'✓':'✕'}</div>
+       <div><div class="quote">«${esc(x.quote)}»</div>
+         <div class="kv">${ok?('найдена в источнике #'+x.chunk_id+' · способ: '+(x.method==='substring'?'дословно':'с поблажкой на косметику')+' · совпадение '+x.score):('не найдена ни в одном источнике · лучшее совпадение '+x.score+' — цитата отклонена')}</div></div>`;
+    v.appendChild(line);
+  });
+  v.appendChild(el('p','small muted',`Подтверждённых цитат: ${r.verified_n||0} из ${(r.quotes||[]).length}. Код сверяет БУКВЫ — что цитата реально есть в тексте.`));
+  out.appendChild(v);
+
+  // 5. Судья — faithfulness
+  if(r.faithfulness){
+    const f=r.faithfulness, col={supported:'var(--ok)',partial:'var(--warn)',unsupported:'var(--bad)',unknown:'var(--muted)'}[f.verdict]||'var(--muted)';
+    const j=el('div','card');
+    j.innerHTML = `<h2>Faithfulness — судья проверяет смысл</h2>
+      <div class="judge"><span class="dot" style="background:${col};width:12px;height:12px"></span>
+        <b>${esc(f.verdict)}</b></div>
+      <p class="small muted" style="margin-top:8px">${esc(f.reason)}</p>
+      <p class="small muted">Код проверил, что цитата настоящая. Судья проверяет другое: следует ли ответ ИЗ цитаты, а не подогнан.</p>`;
+    out.appendChild(j);
+  }
+}
+
+async function calibrate(){
+  const box=$('#cal'); box.classList.remove('hidden');
+  $('#axis').innerHTML='<p class="muted small">Прогоняю 10 вопросов… (~15–20 с)</p>';
+  $('#calbtn').disabled=true;
+  try{
+    const d = await (await fetch('/calibrate')).json();
+    drawAxis(d);
+  }catch(e){ $('#axis').innerHTML='<p class="s-bad">Ошибка: '+esc(''+e)+'</p>'; }
+  $('#calbtn').disabled=false;
+}
+
+function drawAxis(d){
+  const ax=$('#axis'); ax.innerHTML='';
+  ax.appendChild(el('div','axisline'));
+  [0,0.25,0.5,0.75,1].forEach(t=>{
+    const tick=el('div','atick',t.toFixed(2)); tick.style.left=(t*100)+'%'; ax.appendChild(tick);
+  });
+  const thr=+$('#thr').value;
+  const line=el('div','athr'); line.style.left=(thr*100)+'%'; ax.appendChild(line);
+  d.rows.forEach(r=>{
+    const dot=el('div','adot '+(r.in_base?'a-in':'a-trap'));
+    dot.style.left=(r.top*100)+'%'; dot.title=r.q+' — '+r.top.toFixed(3);
+    ax.appendChild(dot);
+  });
+  const g=d.gap;
+  $('#calnote').innerHTML = g.suggest
+    ? `Свои — от ${g.in_min.toFixed(3)}, ловушки — до ${g.trap_max.toFixed(3)}. Между ними яма → порог ≈ <b>${g.suggest}</b> (сейчас стоит ${d.threshold}).`
+    : `Чистой ямы нет: ловушки дотягивают до ${g.trap_max.toFixed(3)}, свои начинаются с ${g.in_min.toFixed(3)} — есть перехлёст, порог придётся выбирать компромиссом (и второй предохранитель, grounding модели, добивает то, что порог пропустил).`;
+}
+
+ask();
+</script>
+</body>
+</html>
