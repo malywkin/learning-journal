@@ -10,6 +10,12 @@ day21/scene_chunking.html
 day21/Precious_Little_Sleep.md
 day21/*.parquet
 
+# День 29 — тот же копирайт: замер и демо содержат дословные цитаты книги + реальные
+# прогоны (приватно). Пушим только КОД метода (compare.py, build_demo.py).
+day29/results.json
+day29/index.html
+day29/run.log
+
 # Виртуальные окружения и кэш Python
 .venv/
 venv/
