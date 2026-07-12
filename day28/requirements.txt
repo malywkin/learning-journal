@@ -1,0 +1,5 @@
+openai>=1.0
+python-telegram-bot>=21
+sentence-transformers
+sqlite-vec
+rapidfuzz
