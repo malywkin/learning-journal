@@ -16,6 +16,9 @@ day29/results.json
 day29/index.html
 day29/run.log
 
+# День 30 — лог uvicorn (мусор прогонов, приватно)
+day30/run.log
+
 # Виртуальные окружения и кэш Python
 .venv/
 venv/
