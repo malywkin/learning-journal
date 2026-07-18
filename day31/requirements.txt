@@ -1,0 +1,11 @@
+# День 31 — ассистент разработчика. Переиспользуем venv Дня 21 (day21/.venv),
+# где уже стоит RAG-стек; добавлен только mcp. Список для чистой установки:
+openai>=1.40            # OpenAI-совместимый SDK (DeepSeek / LM Studio)
+fastapi>=0.110          # веб-лицо (окно чата)
+uvicorn>=0.29           # ASGI-сервер
+mcp>=1.28               # MCP-сервер и клиент (git через MCP)
+sentence-transformers>=3.0   # эмбеддер bge-m3 + cross-encoder реранкер
+sqlite-vec>=0.1.6       # локальный векторный индекс
+langchain-text-splitters>=0.2  # нарезка markdown по заголовкам
+rapidfuzz>=3.0          # (транзитивно из Дня 24, сверка цитат)
+httpx>=0.27             # HTTP-клиент (транзитивно)
