@@ -1,0 +1,44 @@
+# День 32 — AI-ревью кода на GitHub Actions.
+# Это TRIGGER-конец трубы (§12-13): «открылся PR» → запусти ревьюер.
+name: AI-ревью PR
+
+# ── ТРИГГЕР: на открытие PR и на каждый новый коммит в него (бриф: opened+synchronize) ──
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# ── ПРАВА: без этого блока токен сборки read-only и коммент не запостить (бриф) ──
+permissions:
+  contents: read          # прочитать код/diff
+  pull-requests: write    # оставить комментарий-ревью
+
+# ── Не гонять дубли: новый пуш в PR отменяет прошлый незаконченный прогон ──
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Забрать код
+        uses: actions/checkout@v7          # свежий мажор (бриф: v7, Node 24)
+
+      - name: Поставить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Зависимости ревьюера
+        run: pip install -r day32/requirements.txt
+
+      - name: Прогнать AI-ревью и оставить комментарий
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}          # для gh (именно GH_TOKEN, не GITHUB_TOKEN)
+          GH_REPO: ${{ github.repository }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}       # секрет репозитория
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}   # запасной провайдер
+        run: |
+          python day32/ai_review.py \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}"

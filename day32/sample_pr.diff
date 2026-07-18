@@ -1,0 +1,28 @@
+diff --git a/day07/memory.py b/day07/memory.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/day07/memory.py
++++ b/day07/memory.py
+@@ -28,11 +28,8 @@ class JsonMemory:
+     def save(self, history: list[dict]) -> None:
+         """Сохранить всю историю диалога в JSON-файл."""
+-        # атомарно: пишем во временный файл и подменяем — иначе краш посреди
+-        # записи оставит наполовину записанный (битый) файл
+-        tmp = self.path.with_suffix(".tmp")
+-        tmp.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+-        os.replace(tmp, self.path)
++        self.path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+     def load(self) -> list[dict]:
+         if not self.path.exists():
+diff --git a/day07/task7.py b/day07/task7.py
+index 9f8e7d6..1c2b3a4 100644
+--- a/day07/task7.py
++++ b/day07/task7.py
+@@ -4,7 +4,7 @@ import os
+ from openai import OpenAI
+
+ BASE_URL = "https://openrouter.ai/api/v1"
+-client = OpenAI(base_url=BASE_URL, api_key=os.environ["OPENROUTER_API_KEY"])
++client = OpenAI(base_url=BASE_URL, api_key="EXAMPLE_FAKE_KEY_do_not_use")
+
+ agent = Agent(client=client, store="json")
