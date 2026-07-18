@@ -25,7 +25,7 @@ DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL    = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL    = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b")
+OPENROUTER_MODEL    = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
 
 # ── Удержание бюджета/скорости (§15): не суём весь проект, режем контекст ──
 MAX_DIFF_CHARS = int(os.getenv("MAX_DIFF_CHARS", "24000"))   # diff крупнее — обрежем
