@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ассистент файлов проекта — День 34</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2330; --muted:#6b7484; --line:#e6e9ef;
+    --accent:#3b5bdb;
+    --read:#2563eb; --read-bg:#e8f0fe; --write:#c2410c; --write-bg:#fdece0;
+    --code:#0f1626; --codeink:#e6edf3;
+    --add:#116329; --add-bg:#e6ffec; --del:#a40e26; --del-bg:#ffebe9; --hunk:#5b7bff;
+    --ok:#0f9d58; --okbg:#e6f6ec;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0e1116; --panel:#161b22; --ink:#e6edf3; --muted:#8b949e; --line:#2a313c;
+      --accent:#5b7bff; --read-bg:#152238; --write-bg:#2a1a10;
+      --code:#0b0f16; --add:#3fb950; --add-bg:#0f2a18; --del:#f85149; --del-bg:#2d1417;
+      --ok:#3fb950; --okbg:#0f2a1c; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;flex-direction:column;min-height:100vh}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+  header h1{font-size:16px;margin:0;font-weight:650}
+  header .sub{color:var(--muted);font-size:13px}
+  header .legend{margin-left:auto;display:flex;gap:12px;font-size:12px;color:var(--muted)}
+  header .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .dot.read{background:var(--read)} .dot.write{background:var(--write)}
+
+  main{flex:1;max-width:900px;width:100%;margin:0 auto;padding:22px;display:flex;flex-direction:column;gap:18px}
+  .goalbar{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .goalbar textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);
+    color:var(--ink);font:inherit;padding:10px 12px;resize:none;max-height:130px}
+  .goalbar textarea:focus{outline:none;border-color:var(--accent)}
+  .row2{display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap}
+  #run{border:none;background:var(--accent);color:#fff;padding:9px 18px;border-radius:10px;
+    font-weight:600;cursor:pointer}#run:disabled{opacity:.5;cursor:default}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    padding:6px 11px;border-radius:999px;font-size:12.5px;cursor:pointer}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  .trace{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;
+    font-size:12px;font-weight:550}
+  .pill.read{color:var(--read);background:var(--read-bg)} .pill.write{color:var(--write);background:var(--write-bg)}
+  .pill svg{width:13px;height:13px} .pill .arg{opacity:.7;font-weight:450}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .card .head{padding:11px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .badge{font-size:11px;font-weight:650;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+  .badge.create{color:var(--write);background:var(--write-bg)} .badge.edit{color:var(--read);background:var(--read-bg)}
+  .card .path{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+  .card .act{margin-left:auto;display:flex;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 13px;
+    border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn.apply{background:var(--ok);color:#fff;border-color:transparent}
+  .btn.reject:hover{border-color:var(--del);color:var(--del)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .status{padding:9px 15px;font-size:13px;font-weight:600}
+  .status.done{color:var(--ok);background:var(--okbg)} .status.gone{color:var(--muted)}
+
+  pre.diff{margin:0;padding:12px 14px;background:var(--code);overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5}
+  pre.diff .ln{display:block;white-space:pre;color:var(--codeink)}
+  pre.diff .add{color:var(--add);background:var(--add-bg)} pre.diff .del{color:var(--del);background:var(--del-bg)}
+  pre.diff .hunk{color:var(--hunk)} pre.diff .meta{color:var(--muted)}
+
+  .md h1,.md h2,.md h3{margin:.6em 0 .3em;line-height:1.3}
+  .md h1{font-size:1.2em}.md h2{font-size:1.1em}.md h3{font-size:1em}
+  .md p{margin:.45em 0}.md ul,.md ol{margin:.3em 0;padding-left:1.4em}
+  .md code{background:rgba(130,140,160,.16);padding:1px 5px;border-radius:5px;font-family:ui-monospace,Menlo,monospace;font-size:.9em}
+  .md table{border-collapse:collapse;margin:.5em 0;font-size:.92em;display:block;overflow-x:auto}
+  .md th,.md td{border:1px solid var(--line);padding:4px 9px;text-align:left}
+  .md th{background:rgba(130,140,160,.10)}
+  .answer{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .meta{font-size:11px;color:var(--muted);margin-top:6px}
+  .typing{color:var(--muted);font-size:13px}
+  .hint{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ассистент файлов проекта</h1>
+  <span class="sub">проект <b id="proj">…</b> · ставьте цель, а не «открой файл X»</span>
+  <div class="legend">
+    <span><i class="dot read"></i>читал/искал</span>
+    <span><i class="dot write"></i>готовит правку</span>
+  </div>
+</header>
+
+<main>
+  <div class="goalbar">
+    <textarea id="goal" rows="2" placeholder="Цель на уровне задачи, напр.: обнови документацию под текущий код"></textarea>
+    <div class="row2">
+      <button id="run">Поставить задачу</button>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="hint" style="margin-top:8px">Ассистент сам решит, что прочитать и что изменить. Запись на диск — только после вашего «Применить».</div>
+  </div>
+  <div id="out"></div>
+</main>
+
+<script>
+const goalEl=document.getElementById('goal');
+const runBtn=document.getElementById('run');
+const out=document.getElementById('out');
+
+const SCENARIOS=[
+  'Найди все места в проекте, где используется функция save_note, и собери отчёт-файл usages_save_note.md со списком файл:строка.',
+  'Проверь, синхронна ли docs/api.md с кодом notes_api.py, и обнови документацию под фактические сигнатуры функций.',
+  'Проверь файлы проекта на соответствие правилам из RULES.md и предложи правки, устраняющие нарушения.'
+];
+const CHIP_LABEL=['① usages save_note','② обновить доку','③ проверить правила'];
+
+const ICON={
+  read:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  write:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
+};
+
+// ── markdown (компактный, с Дня 31) ──
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function inline(s){return esc(s).replace(/`([^`]+)`/g,(_,c)=>'<code>'+c+'</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');}
+function md(src){
+  const lines=src.replace(/\r/g,'').split('\n');let html='',i=0,g=0;
+  while(i<lines.length){if(++g>20000)break;let ln=lines[i];
+    if(/^\s*\|.*\|\s*$/.test(ln)&&i+1<lines.length&&/^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1])){
+      const head=ln.split('|').slice(1,-1).map(c=>c.trim());i+=2;let body=[];
+      while(i<lines.length&&/^\s*\|.*\|\s*$/.test(lines[i])){body.push(lines[i].split('|').slice(1,-1).map(c=>c.trim()));i++;}
+      html+='<table><thead><tr>'+head.map(h=>'<th>'+inline(h)+'</th>').join('')+'</tr></thead><tbody>'+
+        body.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';continue;}
+    let m;if(m=ln.match(/^(#{1,3})\s+(.*)$/)){html+='<h'+m[1].length+'>'+inline(m[2])+'</h'+m[1].length+'>';i++;continue;}
+    if(/^\s*[-*]\s+/.test(ln)){let buf=[];while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){buf.push('<li>'+inline(lines[i].replace(/^\s*[-*]\s+/,''))+'</li>');i++;}html+='<ul>'+buf.join('')+'</ul>';continue;}
+    if(/^\s*\d+\.\s+/.test(ln)){let buf=[];while(i<lines.length&&/^\s*\d+\.\s+/.test(lines[i])){buf.push('<li>'+inline(lines[i].replace(/^\s*\d+\.\s+/,''))+'</li>');i++;}html+='<ol>'+buf.join('')+'</ol>';continue;}
+    if(ln.trim()===''){i++;continue;}
+    let buf=[lines[i]];i++;const stop=/^(#{1,6}\s|\s*[-*+]\s|\s*\d+\.\s|\s*\|.*\|)/;
+    while(i<lines.length&&lines[i].trim()!==''&&!stop.test(lines[i])){buf.push(lines[i]);i++;}
+    html+='<p>'+inline(buf.join(' '))+'</p>';}
+  return html;
+}
+
+// ── diff-рендер: подсветка + / - / @@ (генерит наш бэкенд, здесь только красим) ──
+function renderDiff(diff){
+  const rows=(diff||'').split('\n').map(l=>{
+    let cls='ln';
+    if(l.startsWith('+++')||l.startsWith('---'))cls='ln meta';
+    else if(l.startsWith('@@'))cls='ln hunk';
+    else if(l.startsWith('+'))cls='ln add';
+    else if(l.startsWith('-'))cls='ln del';
+    return '<span class="'+cls+'">'+esc(l||' ')+'</span>';
+  }).join('');
+  return '<pre class="diff">'+rows+'</pre>';
+}
+
+function traceHtml(trace){
+  if(!trace||!trace.length)return '';
+  return '<div class="trace">'+trace.map(t=>'<span class="pill '+t.kind+'">'+ICON[t.kind]+t.label+
+    (t.arg?' <span class="arg">'+esc(String(t.arg).slice(0,34))+'</span>':'')+'</span>').join('')+'</div>';
+}
+
+function changeCard(ch){
+  const card=document.createElement('div');card.className='card';
+  const kind=ch.kind==='create'?'create':'edit';
+  const kindRu=ch.kind==='create'?'новый файл':'правка';
+  card.innerHTML=
+    '<div class="head"><span class="badge '+kind+'">'+kindRu+'</span>'+
+    '<span class="path">'+esc(ch.relpath)+'</span>'+
+    '<span class="act"><button class="btn apply">Применить</button>'+
+    '<button class="btn reject">Отклонить</button></span></div>'+
+    renderDiff(ch.diff);
+  const applyBtn=card.querySelector('.apply'), rejectBtn=card.querySelector('.reject');
+  applyBtn.onclick=async()=>{
+    applyBtn.disabled=true;rejectBtn.disabled=true;
+    const r=await post('/apply',{token:ch.token});
+    const s=document.createElement('div');
+    if(r.applied){s.className='status done';s.textContent='✓ записано на диск: '+r.relpath+' ('+r.bytes+' байт)';}
+    else{s.className='status gone';s.textContent='не удалось: '+(r.error||'?');applyBtn.disabled=false;rejectBtn.disabled=false;}
+    card.querySelector('.act').style.display='none';card.appendChild(s);
+  };
+  rejectBtn.onclick=async()=>{
+    applyBtn.disabled=true;rejectBtn.disabled=true;
+    await post('/reject',{token:ch.token});
+    const s=document.createElement('div');s.className='status gone';s.textContent='отклонено — на диск не записано';
+    card.querySelector('.act').style.display='none';card.appendChild(s);
+  };
+  return card;
+}
+
+async function post(url,body){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+
+async function run(){
+  const goal=goalEl.value.trim();if(!goal)return;
+  runBtn.disabled=true;out.innerHTML='<div class="answer typing">Ассистент работает с файлами… (читает, ищет, готовит правки)</div>';
+  let res;
+  try{res=await post('/run',{goal});}
+  catch(e){out.innerHTML='<div class="answer">Ошибка связи: '+esc(''+e)+'</div>';runBtn.disabled=false;return;}
+  out.innerHTML='';
+  if(res.trace&&res.trace.length){const t=document.createElement('div');t.innerHTML=traceHtml(res.trace);out.appendChild(t);}
+  const ans=document.createElement('div');ans.className='answer';
+  let body;try{body=md(res.answer||'');}catch(e){body='<p>'+esc(res.answer||'')+'</p>';}
+  ans.innerHTML='<div class="md">'+body+'</div><div class="meta">модель: '+(res.provider||'—')+
+    (res.capped?' · достигнут лимит кругов':'')+'</div>';
+  out.appendChild(ans);
+  (res.changes||[]).forEach(ch=>out.appendChild(changeCard(ch)));
+  if(!res.changes||!res.changes.length){
+    const n=document.createElement('div');n.className='hint';n.style.padding='4px 2px';
+    n.textContent='Правок не предложено (возможно, всё уже в порядке).';out.appendChild(n);
+  }
+  runBtn.disabled=false;
+}
+
+// сборка чипов-сценариев
+const chips=document.getElementById('chips');
+SCENARIOS.forEach((s,i)=>{const b=document.createElement('div');b.className='chip';b.textContent=CHIP_LABEL[i];
+  b.onclick=()=>{goalEl.value=s;goalEl.focus();};chips.appendChild(b);});
+
+goalEl.addEventListener('input',()=>{goalEl.style.height='auto';goalEl.style.height=Math.min(goalEl.scrollHeight,130)+'px';});
+goalEl.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();run();}});
+runBtn.onclick=run;
+fetch('/project').then(r=>r.json()).then(d=>{document.getElementById('proj').textContent=d.name||'проект';});
+</script>
+</body>
+</html>
