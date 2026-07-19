@@ -1,0 +1,7 @@
+# День 35 — приватное, наружу не идёт
+.env
+digests/
+corpus_index.db
+schedule.sqlite
+__pycache__/
+*.mov

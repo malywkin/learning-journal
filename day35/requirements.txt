@@ -1,0 +1,9 @@
+# День 35 — родительский дайджест (пайплайн §12). Реюз venv Дня 21 + доставка/планировщик.
+openai>=1.40                 # клиент к DeepSeek/OpenRouter/локальному LM Studio (§14)
+sentence-transformers>=3.0   # эмбеддер bge-m3 + cross-encoder реранкер (Дни 21/23)
+sqlite-vec>=0.1.6            # векторный индекс корпуса (День 21)
+langchain-text-splitters>=0.3  # нарезка markdown по заголовкам (День 21)
+rapidfuzz>=3.9               # сверка цитат (День 24)
+APScheduler>=3.11,<4         # планировщик TRIGGER, расписание на диске (День 18)
+python-telegram-bot>=22.0    # доставка OUTPUT (Дни 27–28)
+SQLAlchemy>=2.0              # хранилище расписания APScheduler на диске
